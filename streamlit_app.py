@@ -43,6 +43,27 @@ mustermann = {
     }
 }
 
+# --- LİG KATSAYILARI (GÜNCEL OPTA SIRALAMALARI) ---
+LEAGUE_RANKING_MULTIPLIERS = {
+    "Premier League": 1.00,
+    "Spanish First Division": 0.95,
+    "German Bundesliga": 0.95,
+    "Italian Serie A": 0.95,
+    "Ligue 1 McDonald's": 0.95,
+    "Portuguese Premier League": 0.90,
+    "Eredivisie": 0.90,
+    "Sky Bet Championship": 0.88,
+    "Belgian Jupiler Pro League": 0.88,
+    "Turkish Super League": 0.85,
+    "Brazilian National First Division": 0.85,
+    "Austrian Premier Division": 0.82,
+    "Scottish William Hill Premiership": 0.82,
+    "MLS": 0.80,
+    "Polish Ekstraklasa": 0.78,
+    "Turkish 1. League": 0.75,
+    "DEFAULT": 0.70
+}
+
 # --- YARDIM/HOVER SÖZLÜĞÜ ---
 stat_yardim = {
     "Blk/90": "Şut Engelleme: 90 dk başına rakip şutuna siper olma.",
@@ -149,7 +170,7 @@ if file:
     min_v, max_v = int(df['Price_Num'].min()), int(df['Price_Num'].max())
     budget = st.sidebar.slider("Bonservis Aralığı", min_value=min_v, max_value=max_v, value=(min_v, max_v), step=100000)
 
-    # --- HESAPLAMA MOTORU (HİBRİT %70/%30) ---
+    # --- HESAPLAMA MOTORU (LİG KATSAYISI DAHİL) ---
     def calc_scores(row):
         config = role_map[row['Role']]
         bench = mustermann.get(config['bench'], {})
@@ -162,12 +183,27 @@ if file:
                     target_key = next((k for k in bench.keys() if clean_key(k) == clean_key(s)), None)
                     if target_key: scores.append((to_num(row[s]) / bench[target_key][3]) * 100 * w)
             results[prof_name] = np.mean(scores) if scores else 0
+        
+        # Lig Katsayısı Uygulama
+        league_name = row.get('League', 'Unknown')
+        multiplier = LEAGUE_RANKING_MULTIPLIERS.get(league_name, LEAGUE_RANKING_MULTIPLIERS["DEFAULT"])
+        
         bonus = max(0, (23 - row['Age']) * 5) if strategy == "Kâr Odaklı (Geliştir-Sat)" else 0
         secili_rol = row['Rol_Secimi']
-        if secili_rol == "⚖️ Dengeli": final_raw = results["Dengeli_Ham"]
-        elif secili_rol == "⚔️ IP (Hücum)": final_raw = (results["Dengeli_Ham"] * 0.7) + (results["IP_Ham"] * 0.3)
-        else: final_raw = (results["Dengeli_Ham"] * 0.7) + (results["OOP_Ham"] * 0.3)
-        return pd.Series([final_raw + bonus, results["IP_Ham"] + bonus, results["OOP_Ham"] + bonus])
+        
+        if secili_rol == "⚖️ Dengeli": 
+            final_raw = results["Dengeli_Ham"]
+        elif secili_rol == "⚔️ IP (Hücum)": 
+            final_raw = (results["Dengeli_Ham"] * 0.7) + (results["IP_Ham"] * 0.3)
+        else: 
+            final_raw = (results["Dengeli_Ham"] * 0.7) + (results["OOP_Ham"] * 0.3)
+        
+        # Nihai puanlar lig katsayısı ile çarpılarak normalize edilir
+        final_scout = final_raw * multiplier
+        ip_final = results["IP_Ham"] * multiplier
+        oop_final = results["OOP_Ham"] * multiplier
+        
+        return pd.Series([final_scout + bonus, ip_final + bonus, oop_final + bonus])
 
     df[['Scout_Puanı', 'IP_Score', 'OOP_Score']] = df.apply(calc_scores, axis=1)
     df['VFM_Skoru'] = (df['Scout_Puanı'] / ((df['Price_Num'] / 1000000) + 1)).round(1) 
@@ -238,12 +274,15 @@ if file:
         for i, p_name in enumerate(selected_all):
             p_p = f_df[f_df['Player'] == p_name]
             if not p_p.empty: fig_scatter.add_trace(go.Scatter(x=p_p['Scout_Puanı'], y=p_p['VFM_Skoru'], mode='markers', marker=dict(color=RADAR_COLORS[i], size=15, symbol='diamond', line=dict(color='#ffffff', width=1.5)), text=p_p['Player'], hovertemplate="<b>%{text}</b><br>Puan: %{x:.1f}<br>VFM: %{y}<extra></extra>", name=p_name))
+        
         s_mid, v_mid = (f_df['Scout_Puanı'].max() + f_df['Scout_Puanı'].min()) / 2.0, (f_df['VFM_Skoru'].max() + f_df['VFM_Skoru'].min()) / 2.0
         fig_scatter.add_vline(x=s_mid, line_dash="dash", line_color="rgba(255, 255, 255, 0.4)"); fig_scatter.add_hline(y=v_mid, line_dash="dash", line_color="rgba(255, 255, 255, 0.4)")
+        
         fig_scatter.add_annotation(x=1, y=1, xref="paper", yref="paper", text="ELİT (Cevher)", showarrow=False, font=dict(color="#00ff66", size=12), xanchor="right", yanchor="bottom")
         fig_scatter.add_annotation(x=0, y=0, xref="paper", yref="paper", text="RİSKLİ (Verimsiz)", showarrow=False, font=dict(color="#ff0055", size=12), xanchor="left", yanchor="top")
         fig_scatter.add_annotation(x=1, y=0, xref="paper", yref="paper", text="LÜKS (Yıldız)", showarrow=False, font=dict(color="#ffaa00", size=12), xanchor="right", yanchor="top")
         fig_scatter.add_annotation(x=0, y=1, xref="paper", yref="paper", text="FIRSAT (Yatırımlık)", showarrow=False, font=dict(color="#00f2ff", size=12), xanchor="left", yanchor="bottom")
+        
         fig_scatter.update_layout(template="plotly_dark", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', margin=dict(l=20, r=20, t=30, b=20), xaxis_title="Scout Puanı", yaxis_title="VFM Skoru", showlegend=False, height=400); st.plotly_chart(fig_scatter, use_container_width=True)
 
     st.divider(); st.subheader(f"📊 Karşılaştırmalı Veri Havuzu (Tam Detay)")
