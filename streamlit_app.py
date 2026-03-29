@@ -141,13 +141,33 @@ def parse_price(v):
 
 def get_role(pos, sec_pos=""):
     # Position ve Sec. Position verilerini birleştirip analiz ediyoruz.
-    # Savunmadan hücuma dizilim kuralı gereği, tarama sırasını en hücumcu rolden başlatıyoruz.
     combined = (str(pos) + " " + str(sec_pos)).upper()
     
-    # Öncelik Sırası: En Hücumcu -> En Savunmacı
-    if any(k in combined for k in ["ST", "S (C)", "ST (C)"]): return "Forvet"
-    if any(k in combined for k in ["AM (R)", "AM (L)", "M (R)", "M (L)", "W (", "AMR", "AML"]): return "Kanat"
-    if "AM (C)" in combined: return "AM"
+    # Pozisyon varlıklarını kontrol et
+    has_def = any(x in combined for x in ["D (R)", "D (L)", "D (C)", "D (RL", "D (RC", "D (LC", "D (RLC"])
+    has_wb = "WB (" in combined
+    has_winger = any(k in combined for k in ["AM (R)", "AM (L)", "M (R)", "M (L)", "W (", "AMR", "AML"])
+    has_amc = "AM (C)" in combined
+    has_fwd = any(k in combined for k in ["ST", "S (C)", "ST (C)"])
+
+    # --- ÖZEL TWEAK KURALLARI ---
+    
+    # 1. Bek + Kanat + Forvet -> Kanat
+    if has_def and has_winger and has_fwd: return "Kanat"
+    
+    # 2. Kanat + AM + Forvet -> Kanat
+    if has_winger and has_amc and has_fwd: return "Kanat"
+    
+    # 4. Bek + Kanat Bek + Kanat + AM -> Kanat
+    if has_def and has_wb and has_winger and has_amc: return "Kanat"
+    
+    # 3. Bek + Kanat Bek + Kanat -> Bek
+    if has_def and has_wb and has_winger: return "Bek"
+
+    # --- GENEL ÖNCELİK SIRASI ---
+    if has_fwd: return "Forvet"
+    if has_winger: return "Kanat"
+    if has_amc: return "AM"
     if "DM" in combined: return "DM"
     if "D (C)" in combined: return "Stoper"
     if "GK" in combined: return "Kaleci"
