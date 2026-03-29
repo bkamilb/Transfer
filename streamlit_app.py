@@ -316,8 +316,16 @@ if file:
             ax.fill(angles, vals, color=RADAR_COLORS[i], alpha=alpha_val)
             ax.plot(angles, vals, color=RADAR_COLORS[i], linewidth=2, marker=marker_style, markersize=5)
 
-        ax.set_xticks(angles[:-1]); ax.set_xticklabels(labels, size=9, color='white', fontweight='bold')
+        ax.set_xticks(angles[:-1])
+        ax.set_xticklabels(labels, size=9, color='white', fontweight='bold')
+        
+        # RADAR YAZILARI İÇİN ÇÖZÜM: Yazıları grafikten uzaklaştırdık
+        ax.tick_params(axis='x', pad=15) 
+        
         ax.set_ylim(0, 100); ax.grid(True, color='#333333', linestyle='--')
+        
+        # Grafik kenarlarını biraz genişletelim ki itilen yazılar kesilmesin
+        plt.tight_layout(pad=2.0)
         
         st.pyplot(fig)
 
@@ -371,7 +379,6 @@ if file:
         for i, p_name in enumerate(selected_all):
             p_df = f_df[f_df['Player'] == p_name]
             if not p_df.empty:
-                # İstenilen şık, yazısız elmas boncuk görünümü
                 fig_scatter.add_trace(go.Scatter(
                     x=p_df['Scout_Puanı'], y=p_df['VFM_Skoru'],
                     mode='markers',
@@ -386,7 +393,6 @@ if file:
         fig_scatter.add_vline(x=x_mid, line_dash="dash", line_color="rgba(255, 255, 255, 0.4)", line_width=2)
         fig_scatter.add_hline(y=y_mid, line_dash="dash", line_color="rgba(255, 255, 255, 0.4)", line_width=2)
         
-        # Temiz ve köşe uçlarına sabitlenmiş bilgilendirme yazıları
         fig_scatter.add_annotation(x=1, y=1, xref="paper", yref="paper", text="Elit & Kelepir", showarrow=False, font=dict(color="#00ff66", size=11), xanchor="right", yanchor="bottom")
         fig_scatter.add_annotation(x=0, y=0, xref="paper", yref="paper", text="Zayıf & Pahalı", showarrow=False, font=dict(color="#ff0055", size=11), xanchor="left", yanchor="top")
         
@@ -421,7 +427,8 @@ if file:
                 if row['Player'] in selected_all:
                     idx = selected_all.index(row['Player'])
                     c = RADAR_COLORS[idx]
-                    styles.append(f'background-color: #1a2a3a; color: {c}; font-weight: bold;')
+                    # Streamlit Cloud uyumu: Sadece background-color ve color bırakıldı
+                    styles.append(f'background-color: #1a2a3a; color: {c};')
                 else:
                     styles.append('background-color: #161a24; color: #ffffff;')
             elif col in ['Role', 'Rol_Secimi']:
