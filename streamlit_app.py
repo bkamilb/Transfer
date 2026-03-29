@@ -130,46 +130,35 @@ def parse_price(v):
 def get_role(pos, sec_pos=""):
     combined = (str(pos) + " " + str(sec_pos)).upper()
     
-    # 1. Temel Bölge Tespitleri
-    # AM (RLC) veya M (RLC) gibi durumlarda dize içindeki harfleri hassas yakalamak için:
-    has_am_zone = "AM " in combined or "AM/" in combined or "AMR" in combined or "AML" in combined or "AMC" in combined
-    has_m_zone = "M " in combined or "M/" in combined or "MR" in combined or "ML" in combined or "MC" in combined
-    
-    # 2. Yön Tespitleri (AMRLC gibi hibritlerde R, L ve C var mı?)
-    # AM (RLC) yazımında AM ve parantez içindeki harfleri kontrol ediyoruz.
-    # Örnek: "AM (RLC)" -> AM zone içinde R, L ve C var.
-    has_r_direction = any(x in combined for x in ["(R", "R)", "R,", "RC", "RL", "AMR", "MR"])
-    has_l_direction = any(x in combined for x in ["(L", "L)", "L,", "LC", "RL", "AML", "ML"])
-    has_c_direction = any(x in combined for x in ["(C", "C)", "C,", "RC", "LC", "AMC", "MC", "S (C", "ST (C", "D (C"])
-
-    # 3. Kategori Bayrakları
-    has_kanat_mevki = (has_am_zone or has_m_zone) and (has_r_direction or has_l_direction)
-    has_amc = has_am_zone and has_c_direction
-    has_fwd = any(k in combined for k in ["ST", "S (C)", "ST (C)"])
+    # Mevki Bayrakları (Detaylı Analiz)
     has_side_def = any(x in combined for x in ["D (R", "D (L", "D (RL"])
-    has_stoper = "D (C)" in combined
     has_wb = "WB (" in combined
+    has_stoper = "D (C)" in combined
     has_dm = "DM" in combined
     has_gk = "GK" in combined
+    has_fwd = any(k in combined for k in ["ST", "S (C)", "ST (C)"])
+    
+    # Kanat Şartı: AMR, AML, MR, ML veya "AM (RLC)" gibi hibrit yazımlar.
+    # Harf bazlı kontrol: AM veya M bölgesinde olup R veya L yönüne sahip olması.
+    has_kanat_mevki = any(k in combined for k in ["AMR", "AML", "MR", "ML", "W ("]) or \
+                      (("AM" in combined or "M (" in combined or "M/" in combined) and ("R" in combined or "L" in combined))
+    
+    # AMC kontrolü
+    has_amc = any(k in combined for k in ["AM (C)", "AMC", "MC", "(C)"]) and ("AM" in combined or "M" in combined)
 
     # --- HİYERARŞİ VE TWEAK KURALLARI ---
 
-    # KURAL: AMC de varsa (örneğin AMRLC) Kanat hiyerarşisi her zaman önceliklidir (Bek/WB olsa bile)
+    # KURAL: Eğer AMC de varsa (örneğin AMRLC) Kanat hiyerarşisi her zaman önceliklidir (Bek/WB olsa bile)
     if has_kanat_mevki:
-        # AMC varsa doğrudan Kanat
-        if has_amc: return "Kanat"
-        # AMC yoksa ama Forvet veya Bek kombinasyonu varsa yine Kanat (Winger-Forward hibriti)
+        if has_amc: return "Kanat" # "AMC de varsa her halükarda Kanat"
         if has_fwd or has_side_def: return "Kanat"
-        # Saf kanat (AMR, ML vb.)
         return "Kanat"
     
     # KURAL: Bek + Kanat Bek + Kanat (AMC YOKSA) -> Bek
-    # Not: Yukarıdaki if kanat mevkisi varsa çalışacağı için, 
-    # AMRLC gibi AMC'li oyuncular zaten yukarıda "Kanat" olarak elenecek.
     if has_side_def and has_wb and has_kanat_mevki and not has_amc: 
         return "Bek"
 
-    # --- GENEL ÖNCELİK SIRALAMASI (Ne varsa ona göre) ---
+    # --- GENEL ÖNCELİK SIRALAMASI ---
     if has_fwd: return "Forvet"
     if has_amc: return "AM"
     if has_dm: return "DM"
@@ -332,6 +321,20 @@ if file:
                     if st.session_state.player_preferences.get(p_name) != row['Rol_Secimi']:
                         st.session_state.player_preferences[p_name] = row['Rol_Secimi']; changed = True
                 if changed: st.rerun()
+
+        # --- OYUNCU PAZAR MATRİSİ (Scatter Plot) ---
+        st.markdown("---")
+        st.markdown("### 🌌 Oyuncu Pazar Matrisi (Scout Puanı & VFM)")
+        fig_scatter = go.Figure()
+        d_plot = f_df[~f_df['Player'].isin(selected_all)]
+        fig_scatter.add_trace(go.Scatter(x=d_plot['Scout_Puanı'], y=d_plot['VFM_Skoru'], mode='markers', marker=dict(color='white', size=7, opacity=0.3), text=d_plot['Player'], hovertemplate="<b>%{text}</b><br>Puan: %{x:.1f}<br>VFM: %{y}<extra></extra>", name='Diğer'))
+        for i, p_name in enumerate(selected_all):
+            p_p = f_df[f_df['Player'] == p_name]
+            if not p_p.empty: fig_scatter.add_trace(go.Scatter(x=p_p['Scout_Puanı'], y=p_p['VFM_Skoru'], mode='markers', marker=dict(color=RADAR_COLORS[i], size=15, symbol='diamond', line=dict(color='#ffffff', width=1.5)), text=p_p['Player'], hovertemplate="<b>%{text}</b><br>Puan: %{x:.1f}<br>VFM: %{y}<extra></extra>", name=p_name))
+        
+        s_mid, v_mid = (f_df['Scout_Puanı'].max() + f_df['Scout_Puanı'].min()) / 2.0, (f_df['VFM_Skoru'].max() + f_df['VFM_Skoru'].min()) / 2.0
+        fig_scatter.add_vline(x=s_mid, line_dash="dash", line_color="rgba(255, 255, 255, 0.4)"); fig_scatter.add_hline(y=v_mid, line_dash="dash", line_color="rgba(255, 255, 255, 0.4)")
+        fig_scatter.update_layout(template="plotly_dark", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', margin=dict(l=20, r=20, t=30, b=20), xaxis_title="Scout Puanı", yaxis_title="VFM Skoru", height=400); st.plotly_chart(fig_scatter, use_container_width=True)
 
     st.divider(); st.subheader(f"📊 Karşılaştırmalı Veri Havuzu (Tam Detay)")
     top_dfs = [f_df[f_df['Player'] == p_name] for p_name in selected_all]
