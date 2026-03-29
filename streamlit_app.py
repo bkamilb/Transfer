@@ -238,7 +238,7 @@ if file:
         else: final_raw = (results["Dengeli_Ham"] * 0.7) + (results["OOP_Ham"] * 0.3)
         
         total_mult = multiplier * char_multiplier
-        bonus = max(0, (23 - row['Age']) * 5) if strategy == "Kâr Odaklı (Geliştir-Sat)" else 0
+        bonus = max(0, (23 - row['Age']) * 10) if strategy == "Kâr Odaklı (Geliştir-Sat)" else 0
         return pd.Series([final_raw * total_mult + bonus, results["IP_Ham"] * total_mult + bonus, results["OOP_Ham"] * total_mult + bonus])
 
     df[['Scout_Puanı', 'IP_Score', 'OOP_Score']] = df.apply(calc_scores, axis=1)
