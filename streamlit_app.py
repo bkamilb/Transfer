@@ -161,7 +161,7 @@ def get_role(pos):
     if "D (C)" in pos: return "Stoper"
     return "Bek"
 
-# RENK PALETİ (Dengeli / IP / OOP / Kıyas)
+# RENK PALETİ
 RADAR_COLORS = ['#00f2ff', '#ff0055', '#00ff66', '#ffaa00']
 
 # --- 4. STREAMLIT UI ---
@@ -253,7 +253,6 @@ if file:
         for i, p_name in enumerate(selected_all):
             legend_html += f"<div style='color: {RADAR_COLORS[i]}; font-weight: bold; margin-top: 3px;'>■ {p_name}</div>"
 
-        # Kıyas Listesi Başlığı
         if len(selected_all) > 1:
             kiyas_baslik = "<div style='color: #aaaaaa; margin-bottom: 5px; border-bottom: 1px solid #333333; padding-bottom: 3px; font-size: 10px; text-transform: uppercase;'>Kıyas Listesi</div>"
         else:
@@ -292,7 +291,6 @@ if file:
         else:
             radar_stats = list(role_map[role]['weights'][grafik_aktif_rol].keys())
 
-        # Çoklu Radar Çizimi
         fig, ax = plt.subplots(figsize=(4, 4), subplot_kw={"polar": True})
         fig.patch.set_facecolor('#0E1117'); ax.set_facecolor('#161A24')
         
@@ -318,20 +316,15 @@ if file:
 
         ax.set_xticks(angles[:-1])
         ax.set_xticklabels(labels, size=9, color='white', fontweight='bold')
-        
-        # RADAR YAZILARI İÇİN ÇÖZÜM: Yazıları grafikten uzaklaştırdık
-        ax.tick_params(axis='x', pad=15) 
-        
-        ax.set_ylim(0, 100); ax.grid(True, color='#333333', linestyle='--')
-        
-        # Grafik kenarlarını biraz genişletelim ki itilen yazılar kesilmesin
+        ax.tick_params(axis='x', pad=15)
+        ax.set_yticks([20, 40, 60, 80, 100])
+        ax.set_ylim(0, 120) 
+        ax.grid(True, color='#333333', linestyle='--')
         plt.tight_layout(pad=2.0)
-        
         st.pyplot(fig)
 
     with col_m:
         st.markdown("### 📋 Oyuncu Analiz Masası")
-        
         show_df = f_df[['Player', 'Age', 'Role', 'IP_Score', 'OOP_Score', 'Rol_Secimi', 'Scout_Puanı', 'VFM_Skoru', 'Price_Num']].copy()
         show_df.rename(columns={'Price_Num': 'Bonservis (€)'}, inplace=True)
         
@@ -351,100 +344,61 @@ if file:
 
         changes = False
         for idx, row in edited_df.iterrows():
-            player_name = row['Player']
-            new_role = row['Rol_Secimi']
-            if st.session_state.player_roles.get(player_name, "⚖️ Dengeli") != new_role:
-                st.session_state.player_roles[player_name] = new_role
+            if st.session_state.player_roles.get(row['Player'], "⚖️ Dengeli") != row['Rol_Secimi']:
+                st.session_state.player_roles[row['Player']] = row['Rol_Secimi']
                 changes = True
         if changes:
             st.rerun()
 
-        # --- OYUN İÇİ PAZAR MATRİSİ (PUAN vs VFM) ---
+        # --- OYUN İÇİ PAZAR MATRİSİ (TAMAMLARNDI) ---
         st.markdown("---")
         st.markdown("### 🌌 Oyuncu Pazar Matrisi (Puan & VFM)")
-        st.markdown("<span style='color:#aaaaaa; font-size:13px;'>Sağ üst bölge elit ve kelepir oyuncuları (Yüksek Puan, Yüksek VFM) temsil eder. Renkli kutularla isimler eşleştirilmiştir.</span>", unsafe_allow_html=True)
-        
         fig_scatter = go.Figure()
-        
         diger_df = f_df[~f_df['Player'].isin(selected_all)]
-        fig_scatter.add_trace(go.Scatter(
-            x=diger_df['Scout_Puanı'], y=diger_df['VFM_Skoru'],
-            mode='markers',
-            marker=dict(color='white', size=7, opacity=0.3),
-            text=diger_df['Player'],
-            hovertemplate="<b>%{text}</b><br>Puan: %{x:.1f}<br>VFM: %{y:.1f}<extra></extra>",
-            name='Diğer'
-        ))
-        
+        fig_scatter.add_trace(go.Scatter(x=diger_df['Scout_Puanı'], y=diger_df['VFM_Skoru'], mode='markers', marker=dict(color='white', size=7, opacity=0.3), text=diger_df['Player'], hovertemplate="<b>%{text}</b><br>Puan: %{x:.1f}<br>VFM: %{y:.1f}<extra></extra>", name='Diğer'))
         for i, p_name in enumerate(selected_all):
             p_df = f_df[f_df['Player'] == p_name]
             if not p_df.empty:
-                fig_scatter.add_trace(go.Scatter(
-                    x=p_df['Scout_Puanı'], y=p_df['VFM_Skoru'],
-                    mode='markers',
-                    marker=dict(color=RADAR_COLORS[i], size=16, symbol='diamond', line=dict(color='#ffffff', width=1.5)),
-                    text=p_df['Player'],
-                    hovertemplate="<b>%{text}</b><br>Puan: %{x:.1f}<br>VFM: %{y:.1f}<extra></extra>",
-                    name=p_name
-                ))
-                
-        x_mid = f_df['Scout_Puanı'].mean()
-        y_mid = f_df['VFM_Skoru'].mean()
+                fig_scatter.add_trace(go.Scatter(x=p_df['Scout_Puanı'], y=p_df['VFM_Skoru'], mode='markers', marker=dict(color=RADAR_COLORS[i], size=16, symbol='diamond', line=dict(color='#ffffff', width=1.5)), text=p_df['Player'], hovertemplate="<b>%{text}</b><br>Puan: %{x:.1f}<br>VFM: %{y:.1f}<extra></extra>", name=p_name))
+        
+        # Çizgi ve Köşe Ayarları
+        x_min, x_max = f_df['Scout_Puanı'].min(), f_df['Scout_Puanı'].max()
+        y_min, y_max = f_df['VFM_Skoru'].min(), f_df['VFM_Skoru'].max()
+        x_mid, y_mid = (x_max + x_min) / 2.0, (y_max + y_min) / 2.0
+        
         fig_scatter.add_vline(x=x_mid, line_dash="dash", line_color="rgba(255, 255, 255, 0.4)", line_width=2)
         fig_scatter.add_hline(y=y_mid, line_dash="dash", line_color="rgba(255, 255, 255, 0.4)", line_width=2)
         
         fig_scatter.add_annotation(x=1, y=1, xref="paper", yref="paper", text="Elit & Kelepir", showarrow=False, font=dict(color="#00ff66", size=11), xanchor="right", yanchor="bottom")
         fig_scatter.add_annotation(x=0, y=0, xref="paper", yref="paper", text="Zayıf & Pahalı", showarrow=False, font=dict(color="#ff0055", size=11), xanchor="left", yanchor="top")
+        fig_scatter.add_annotation(x=0, y=1, xref="paper", yref="paper", text="Potansiyel / Gelişim", showarrow=False, font=dict(color="#00f2ff", size=11), xanchor="left", yanchor="bottom")
+        fig_scatter.add_annotation(x=1, y=0, xref="paper", yref="paper", text="Lüks / Yıldız", showarrow=False, font=dict(color="#ffaa00", size=11), xanchor="right", yanchor="top")
         
-        fig_scatter.update_layout(
-            template="plotly_dark",
-            paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-            margin=dict(l=20, r=20, t=30, b=20),
-            xaxis_title="Scout Puanı",
-            yaxis_title="VFM Skoru",
-            showlegend=False,
-            height=400
-        )
+        fig_scatter.update_layout(template="plotly_dark", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', margin=dict(l=20, r=20, t=30, b=20), xaxis_title="Scout Puanı", yaxis_title="VFM Skoru", showlegend=False, height=400)
         st.plotly_chart(fig_scatter, use_container_width=True)
 
-    # --- ALT TABLO (SEÇİLİLER EN ÜSTTE VE RENKLİ) ---
+    # --- VERİ HAVUZU (BULUT SUNUCUSU İÇİN %100 RENK GARANTİSİ) ---
     st.divider()
     st.subheader(f"📊 Karşılaştırmalı Veri Havuzu (Tam Detay)")
-    
     top_dfs = [f_df[f_df['Player'] == p_name] for p_name in selected_all]
     rest_df = f_df[~f_df['Player'].isin(selected_all)].sort_values('Scout_Puanı', ascending=False)
-    
-    # BULUT SUNUCUSU İÇİN KESİN ÇÖZÜM: İndeksler sıfırlandı
     final_bottom_df = pd.concat(top_dfs + [rest_df]).reset_index(drop=True)
-    
     num_cols = [c for c in df.columns if any(x in c for x in ['/90', '%'])]
     deep_cols = ['Player', 'Role', 'Rol_Secimi'] + num_cols
     
-    def apply_final_styling(row):
-        styles = []
-        for col in row.index:
-            if col == 'Player':
-                if row['Player'] in selected_all:
-                    idx = selected_all.index(row['Player'])
-                    c = RADAR_COLORS[idx]
-                    # Streamlit Cloud uyumu: Sadece background-color ve color bırakıldı
-                    styles.append(f'background-color: #1a2a3a; color: {c};')
-                else:
-                    styles.append('background-color: #161a24; color: #ffffff;')
-            elif col in ['Role', 'Rol_Secimi']:
-                styles.append('background-color: #161a24; color: #aaaaaa;')
-            else:
-                styles.append(get_mustermann_color(row[col], col, row['Role']))
+    def style_dataframe(data):
+        styles = pd.DataFrame('', index=data.index, columns=data.columns)
+        for i in data.index:
+            row = data.loc[i]
+            p_idx = selected_all.index(row['Player']) if row['Player'] in selected_all else -1
+            for col in data.columns:
+                if col == 'Player':
+                    if p_idx != -1: styles.at[i, col] = f'background-color: #1a2a3a; color: {RADAR_COLORS[p_idx]}; font-weight: bold;'
+                    else: styles.at[i, col] = 'background-color: #161a24; color: #ffffff;'
+                elif col in ['Role', 'Rol_Secimi']: styles.at[i, col] = 'background-color: #161a24; color: #aaaaaa;'
+                else: styles.at[i, col] = get_mustermann_color(row[col], col, row['Role'])
         return styles
 
-    # BULUT SUNUCUSU İÇİN KESİN ÇÖZÜM 2: hide_index=True eklendi
-    st.dataframe(final_bottom_df[deep_cols].style.apply(apply_final_styling, axis=1), use_container_width=True, hide_index=True)
-    
-    st.markdown("""
-    <div style="display: flex; gap: 15px; justify-content: center; margin-top: 15px; font-weight: bold;">
-        <div style="background-color: #6a0dad; padding: 7px 15px; border-radius: 4px; color: white;">🟣 ELITE</div>
-        <div style="background-color: #2e7d32; padding: 7px 15px; border-radius: 4px; color: white;">🟢 GOOD</div>
-        <div style="background-color: #fbc02d; padding: 7px 15px; border-radius: 4px; color: black;">🟡 AVG</div>
-        <div style="background-color: #c62828; padding: 7px 15px; border-radius: 4px; color: white;">🔴 POOR</div>
-    </div>
-    """, unsafe_allow_html=True)
+    # hide_index kaldırıldı, axis=None eklendi
+    st.dataframe(final_bottom_df[deep_cols].style.apply(style_dataframe, axis=None), use_container_width=True)
+    st.markdown("<div style='display:flex;gap:15px;justify-content:center;font-weight:bold;margin-top:10px;'><div style='background:#6a0dad;padding:7px 15px;border-radius:4px;color:white;'>🟣 ELITE</div><div style='background:#2e7d32;padding:7px 15px;border-radius:4px;color:white;'>🟢 GOOD</div><div style='background:#fbc02d;padding:7px 15px;border-radius:4px;color:black;'>🟡 AVG</div><div style='background:#c62828;padding:7px 15px;border-radius:4px;color:white;'>🔴 POOR</div></div>", unsafe_allow_html=True)
