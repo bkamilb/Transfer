@@ -43,29 +43,26 @@ mustermann = {
     }
 }
 
-# --- LİG KATSAYILARI (GÜNCEL OPTA SIRALAMALARI & CSV UYUMU) ---
+# --- LİG KATSAYILARI ---
 LEAGUE_RANKING_MULTIPLIERS = {
-    "Premier League": 1.00,
-    "Spanish First Division": 0.95,
-    "Bundesliga": 0.95,
-    "German Bundesliga": 0.95,
-    "Italian Serie A": 0.95,
-    "Serie A": 0.95,
-    "Ligue 1 McDonald's": 0.95,
-    "Portuguese Premier League": 0.90,
-    "Eredivisie": 0.90,
-    "Sky Bet Championship": 0.88,
-    "Belgian Jupiler Pro League": 0.88,
-    "Turkish Super League": 0.85,
-    "Brazilian National First Division": 0.85,
-    "Austrian Premier Division": 0.82,
-    "Scottish William Hill Premiership": 0.82,
-    "MLS": 0.80,
-    "Polish Ekstraklasa": 0.78,
-    "Turkish 1. League": 0.75,
-    "Second Division": 0.75,
-    "Intermedia": 0.70,
+    "Premier League": 1.00, "First Division": 1.00,
+    "Spanish First Division": 0.95, "German Bundesliga": 0.95, "Italian Serie A": 0.95, "Serie A": 0.95,
+    "Ligue 1 McDonald's": 0.95, "Portuguese Premier League": 0.90, "Eredivisie": 0.90,
+    "Sky Bet Championship": 0.88, "Belgian Jupiler Pro League": 0.88,
+    "Turkish Super League": 0.85, "Brazilian National First Division": 0.85,
+    "Austrian Premier Division": 0.82, "Scottish William Hill Premiership": 0.82, "MLS": 0.80,
+    "Polish Ekstraklasa": 0.78, "Turkish 1. League": 0.75, "Second Division": 0.75,
+    "Intermedia": 0.70, "I League": 0.70, "Metropolitan Zone B": 0.65,
     "DEFAULT": 0.70
+}
+
+# --- KARAKTER & KİŞİLİK KATSOYILARI ---
+CHARACTER_MULTIPLIERS = {
+    "Unflappable": 1.05, "Evasive": 1.04, "Reserved": 1.03, "Level-headed": 1.03, "Media-friendly": 1.01,
+    "Balanced": 1.00, "Normal": 1.00, "Quiet": 1.00,
+    "Volatile": 0.94, "Outspoken": 0.95, "Confrontational": 0.93, "Short-fused": 0.92,
+    "Model Citizen": 1.10, "Model Professional": 1.10, "Professional": 1.08, "Perfectionist": 1.06,
+    "Driven": 1.05, "Determined": 1.04, "Casual": 0.92, "Slack": 0.90, "Temperamental": 0.90
 }
 
 # --- YARDIM/HOVER SÖZLÜĞÜ ---
@@ -73,22 +70,20 @@ stat_yardim = {
     "Blk/90": "Şut Engelleme: 90 dk başına rakip şutuna siper olma.",
     "Clr/90": "Uzaklaştırma: 90 dk başına topu uzaklaştırma başarısı.",
     "Int/90": "Pas Arası: 90 dk başına rakip pasını kesme başarısı.",
-    "Aer A/90": "Hava Topu Girişimi: 90 dk başına çıkılan kafa topu mücadelesi.",
-    "Hdr %": "Hava Topu Başarısı: Çıkılan hava toplarını kazanma yüzdesi.",
-    "Poss Won/90": "Top Kazanma: 90 dk başına rakip ayağından kazanılan toplar.",
-    "Ps A/90": "Pas İsabeti: 90 dk başına atılan başarılı pas sayısı.",
-    "Pr passes/90": "Progresif Pas: Takımı kaleye yaklaştıran dikine paslar.",
-    "Poss Lost/90": "Top Kaybı: 90 dk başına yapılan kritik top kaybı.",
-    "Drb/90": "Dripling: 90 dk başına başarılı adam geçme aksiyonu.",
-    "KP/90": "Kilit Pas: Şutla sonuçlanan veya savunma kıran paslar.",
-    "xA/90": "Beklenen Asist: Verilen pasların gol olma olasılığı değeri.",
-    "xG/90": "Beklenen Gol: Yakalanan pozisyonların gol olma olasılığı değeri.",
-    "Shot/90": "Şut: 90 dk başına rakip kaleye gönderilen şutlar.",
-    "Tck A/90": "Top Kapma Girişimi: 90 dk başına yapılan müdahale denemesi.",
-    "IP_Score": "Hücum Skoru: Top takımınızdayken oyuncunun toplam verimi.",
-    "OOP_Score": "Savunma Skoru: Top rakipteyken oyuncunun defans verimi.",
-    "Scout_Puanı": "Nihai Puan: Seçilen profile göre hesaplanan toplam kalite skoru.",
-    "VFM_Skoru": "Verimlilik (VFM): Scout puanının maliyete oranı."
+    "Aer A/90": "Hava Topu Girişimi: 90 dk başına kafa topu mücadelesi.",
+    "Hdr %": "Hava Topu Başarısı: Kazanılan hava topları yüzdesi.",
+    "Poss Won/90": "Top Kazanma: 90 dk başına kazanılan toplar.",
+    "Ps A/90": "Pas İsabeti: 90 dk başına başarılı pas sayısı.",
+    "Pr passes/90": "Progresif Pas: Dikine paslar.",
+    "Poss Lost/90": "Top Kaybı: 90 dk başına kritik kayıp.",
+    "Drb/90": "Dripling: Başarılı adam geçme.",
+    "KP/90": "Kilit Pas: Şutla sonuçlanan pas.",
+    "xA/90": "Beklenen Asist (xA).", "xG/90": "Beklenen Gol (xG).",
+    "Shot/90": "Şut Sayısı.", "Tck A/90": "Top Kapma Girişimi.",
+    "IP_Score": "Hücum Skoru (Top takımdaysa).",
+    "OOP_Score": "Savunma Skoru (Top rakipteyse).",
+    "Scout_Puanı": "Nihai Scout Kalite Skoru.",
+    "VFM_Skoru": "Value For Money: Maliyet/Verim oranı."
 }
 
 # --- 2. DİNAMİK PROFİLLER ---
@@ -174,7 +169,7 @@ if file:
     min_v, max_v = int(df['Price_Num'].min()), int(df['Price_Num'].max())
     budget = st.sidebar.slider("Bonservis Aralığı", min_value=min_v, max_value=max_v, value=(min_v, max_v), step=100000)
 
-    # --- HESAPLAMA MOTORU (LİG KATSAYISI DAHİL) ---
+    # --- HESAPLAMA MOTORU ---
     def calc_scores(row):
         config = role_map[row['Role']]
         bench = mustermann.get(config['bench'], {})
@@ -188,13 +183,17 @@ if file:
                     if target_key: scores.append((to_num(row[s]) / bench[target_key][3]) * 100 * w)
             results[prof_name] = np.mean(scores) if scores else 0
         
-        # 1. Dosyandaki sütun adıyla (Division) lig ismini al
+        # 1. Lig Katsayısı (Division)
         league_name = row.get('Division', 'Unknown')
-        
-        # 2. Sözlükten katsayıyı çek (Bulamazsa DEFAULT 0.70 kullanır)
         multiplier = LEAGUE_RANKING_MULTIPLIERS.get(league_name, LEAGUE_RANKING_MULTIPLIERS["DEFAULT"])
         
-        # 3. Mevcut 'Dengeli' bazlı hibrit hesaplamayı yap
+        # 2. Çoklu Karakter/Kişilik Çarpanı (Virgülle ayrılmış değerleri işler)
+        raw_char = str(row.get('Personality', row.get('Media Handling', 'Balanced')))
+        traits = [t.strip() for t in raw_char.split(',')]
+        char_mults = [CHARACTER_MULTIPLIERS.get(t, 1.0) for t in traits if t != 'None']
+        char_multiplier = np.mean(char_mults) if char_mults else 1.0
+        
+        # 3. Hibrit Puanlama Mantığı
         secili_rol = row['Rol_Secimi']
         if secili_rol == "⚖️ Dengeli": 
             final_raw = results["Dengeli_Ham"]
@@ -203,12 +202,13 @@ if file:
         else: 
             final_raw = (results["Dengeli_Ham"] * 0.7) + (results["OOP_Ham"] * 0.3)
         
-        # 4. Nihai puanlar lig katsayısı ile çarpılarak normalize edilir
-        final_scout = final_raw * multiplier
-        ip_final = results["IP_Ham"] * multiplier
-        oop_final = results["OOP_Ham"] * multiplier
+        # 4. Nihai Çarpımlar
+        total_mult = multiplier * char_multiplier
+        final_scout = final_raw * total_mult
+        ip_final = results["IP_Ham"] * total_mult
+        oop_final = results["OOP_Ham"] * total_mult
         
-        # 5. Yaş bonusunu lig çarpanından etkilenmeyecek şekilde en son ekle
+        # 5. Yaş Bonusu (Potansiyel)
         bonus = max(0, (23 - row['Age']) * 5) if strategy == "Kâr Odaklı (Geliştir-Sat)" else 0
         
         return pd.Series([final_scout + bonus, ip_final + bonus, oop_final + bonus])
@@ -230,6 +230,10 @@ if file:
         if p['OOP_Score'] >= 80.0: badges.append("🧱 Duvar")
         if p['IP_Score'] >= 80.0: badges.append("🪄 Maestro")
         if p['Scout_Puanı'] >= 85.0: badges.append("⭐ Elit Sınıf")
+        
+        apps_clean = to_num(str(p['Appearances']).split('(')[0])
+        if apps_clean < 10: badges.append("⚠️ Düşük Örneklem")
+
         if badges: st.markdown(f"<div style='margin-bottom: 10px; font-size: 14px;'><b>Rozetler:</b> {' | '.join(badges)}</div>", unsafe_allow_html=True)
         
         legend_html = "".join([f"<div style='color: {RADAR_COLORS[i]}; font-weight: bold; margin-top: 3px;'>■ {p_name}</div>" for i, p_name in enumerate(selected_all)])
@@ -260,14 +264,13 @@ if file:
         st.markdown("### 📋 Oyuncu Analiz Masası")
         show_df = f_df[['Player', 'Age', 'Role', 'IP_Score', 'OOP_Score', 'Rol_Secimi', 'Scout_Puanı', 'VFM_Skoru', 'Price_Num']].copy()
         
-        # --- ANALİZ MASASI HOVER VE FORMAT ---
         edited_df = st.data_editor(show_df, column_config={
             "IP_Score": st.column_config.ProgressColumn("⚔️ IP", help=stat_yardim["IP_Score"], format="%.1f", min_value=0, max_value=200),
             "OOP_Score": st.column_config.ProgressColumn("🛡️ OOP", help=stat_yardim["OOP_Score"], format="%.1f", min_value=0, max_value=200),
             "Rol_Secimi": st.column_config.SelectboxColumn("🔄 Tercih", help="Profil değiştirince Puan güncellenir", options=list(rol_isimleri.keys())),
             "Scout_Puanı": st.column_config.ProgressColumn("⭐ Puan", help=stat_yardim["Scout_Puanı"], format="%.1f", min_value=0, max_value=200),
             "VFM_Skoru": st.column_config.NumberColumn("VFM", help=stat_yardim["VFM_Skoru"]),
-            "Price_Num": st.column_config.NumberColumn("Bonservis (€)", help="Sayısal sıralama için orijinal format korunmuştur.", format="%d")
+            "Price_Num": st.column_config.NumberColumn("Bonservis (€)", format="%d")
         }, disabled=["Player", "Age", "Role", "IP_Score", "OOP_Score", "Scout_Puanı", "VFM_Skoru"], use_container_width=True, hide_index=True, height=450)
         
         for idx, row in edited_df.iterrows():
@@ -299,7 +302,6 @@ if file:
     final_bottom_df = pd.concat(top_dfs + [rest_df]).reset_index(drop=True)
     num_cols = [c for c in df.columns if any(x in c for x in ['/90', '%'])]
     
-    # --- VERİ HAVUZU HOVER KONFİGÜRASYONU ---
     pool_config = {s: st.column_config.NumberColumn(s, help=stat_yardim.get(s, "İstatistik detayı")) for s in num_cols}
     pool_config["Player"] = st.column_config.TextColumn("Player", width="large")
 
