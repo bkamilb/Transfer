@@ -43,12 +43,14 @@ mustermann = {
     }
 }
 
-# --- LİG KATSAYILARI (GÜNCEL OPTA SIRALAMALARI) ---
+# --- LİG KATSAYILARI (GÜNCEL OPTA SIRALAMALARI & CSV UYUMU) ---
 LEAGUE_RANKING_MULTIPLIERS = {
     "Premier League": 1.00,
     "Spanish First Division": 0.95,
+    "Bundesliga": 0.95,
     "German Bundesliga": 0.95,
     "Italian Serie A": 0.95,
+    "Serie A": 0.95,
     "Ligue 1 McDonald's": 0.95,
     "Portuguese Premier League": 0.90,
     "Eredivisie": 0.90,
@@ -61,6 +63,8 @@ LEAGUE_RANKING_MULTIPLIERS = {
     "MLS": 0.80,
     "Polish Ekstraklasa": 0.78,
     "Turkish 1. League": 0.75,
+    "Second Division": 0.75,
+    "Intermedia": 0.70,
     "DEFAULT": 0.70
 }
 
@@ -184,13 +188,14 @@ if file:
                     if target_key: scores.append((to_num(row[s]) / bench[target_key][3]) * 100 * w)
             results[prof_name] = np.mean(scores) if scores else 0
         
-        # Lig Katsayısı Uygulama
-        league_name = row.get('League', 'Unknown')
+        # 1. Dosyandaki sütun adıyla (Division) lig ismini al
+        league_name = row.get('Division', 'Unknown')
+        
+        # 2. Sözlükten katsayıyı çek (Bulamazsa DEFAULT 0.70 kullanır)
         multiplier = LEAGUE_RANKING_MULTIPLIERS.get(league_name, LEAGUE_RANKING_MULTIPLIERS["DEFAULT"])
         
-        bonus = max(0, (23 - row['Age']) * 5) if strategy == "Kâr Odaklı (Geliştir-Sat)" else 0
+        # 3. Mevcut 'Dengeli' bazlı hibrit hesaplamayı yap
         secili_rol = row['Rol_Secimi']
-        
         if secili_rol == "⚖️ Dengeli": 
             final_raw = results["Dengeli_Ham"]
         elif secili_rol == "⚔️ IP (Hücum)": 
@@ -198,10 +203,13 @@ if file:
         else: 
             final_raw = (results["Dengeli_Ham"] * 0.7) + (results["OOP_Ham"] * 0.3)
         
-        # Nihai puanlar lig katsayısı ile çarpılarak normalize edilir
+        # 4. Nihai puanlar lig katsayısı ile çarpılarak normalize edilir
         final_scout = final_raw * multiplier
         ip_final = results["IP_Ham"] * multiplier
         oop_final = results["OOP_Ham"] * multiplier
+        
+        # 5. Yaş bonusunu lig çarpanından etkilenmeyecek şekilde en son ekle
+        bonus = max(0, (23 - row['Age']) * 5) if strategy == "Kâr Odaklı (Geliştir-Sat)" else 0
         
         return pd.Series([final_scout + bonus, ip_final + bonus, oop_final + bonus])
 
