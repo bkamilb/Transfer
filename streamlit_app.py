@@ -143,34 +143,39 @@ def get_role(pos, sec_pos=""):
     # Position ve Sec. Position verilerini birleştirip analiz ediyoruz.
     combined = (str(pos) + " " + str(sec_pos)).upper()
     
-    # Pozisyon varlıklarını kontrol et
-    has_def = any(x in combined for x in ["D (R)", "D (L)", "D (C)", "D (RL", "D (RC", "D (LC", "D (RLC"])
+    # Pozisyon varlıklarını kontrol et (Hassas tarama)
+    has_side_def = any(x in combined for x in ["D (R", "D (L", "D (RL"])
+    has_stoper = "D (C)" in combined
     has_wb = "WB (" in combined
     has_winger = any(k in combined for k in ["AM (R)", "AM (L)", "M (R)", "M (L)", "W (", "AMR", "AML"])
-    has_amc = "AM (C)" in combined
+    has_amc = any(k in combined for k in ["AM (C)", "AMC"])
+    # AM/MRLC gibi durumları yakalamak için daha esnek AM kontrolü
+    has_any_am = any(k in combined for k in ["AM (", "AMR", "AML", "AMC", "AM/"])
     has_fwd = any(k in combined for k in ["ST", "S (C)", "ST (C)"])
 
     # --- ÖZEL TWEAK KURALLARI ---
     
     # 1. Bek + Kanat + Forvet -> Kanat
-    if has_def and has_winger and has_fwd: return "Kanat"
+    if has_side_def and has_winger and has_fwd: return "Kanat"
     
     # 2. Kanat + AM + Forvet -> Kanat
     if has_winger and has_amc and has_fwd: return "Kanat"
     
-    # 4. Bek + Kanat Bek + Kanat + AM -> Kanat
-    if has_def and has_wb and has_winger and has_amc: return "Kanat"
+    # 3. Bek + Kanat Bek + Kanat + AMC -> Kanat (AMC şartı)
+    if has_side_def and has_wb and has_winger and has_amc: return "Kanat"
     
-    # 3. Bek + Kanat Bek + Kanat -> Bek
-    if has_def and has_wb and has_winger: return "Bek"
+    # 4. Bek + Kanat Bek + Kanat -> Bek (AMC yoksa)
+    if has_side_def and has_wb and has_winger: return "Bek"
 
     # --- GENEL ÖNCELİK SIRASI ---
     if has_fwd: return "Forvet"
+    if has_any_am: return "Kanat" # AM yeteneği varsa doğrudan Kanat
     if has_winger: return "Kanat"
     if has_amc: return "AM"
     if "DM" in combined: return "DM"
-    if "D (C)" in combined: return "Stoper"
+    if has_stoper: return "Stoper"
     if "GK" in combined: return "Kaleci"
+    
     return "Bek"
 
 RADAR_COLORS = ['#00f2ff', '#ff0055', '#00ff66', '#ffaa00']
@@ -195,7 +200,6 @@ if file:
     for idx, row in df.iterrows():
         p_name = row['Player']
         if p_name not in st.session_state.player_base_roles:
-            # Sec. Position sütunu varsa onu da gönderiyoruz
             sec_pos_val = row.get('Sec. Position', "")
             st.session_state.player_base_roles[p_name] = get_role(row['Position'], sec_pos_val)
         if p_name not in st.session_state.player_preferences:
@@ -212,7 +216,6 @@ if file:
 
     # --- HESAPLAMA MOTORU ---
     def calc_scores(row):
-        # Mevki veya tercihin boş gelmesi durumunda patlamaması için kontrol
         player_role = row.get('Role', "Bek")
         if player_role not in role_map: player_role = "Bek"
         
@@ -237,7 +240,6 @@ if file:
         char_multiplier = np.mean(char_mults) if char_mults else 1.0
         
         secili_rol = row.get('Rol_Secimi', "⚖️ Dengeli")
-        # Geçersiz bir tercih gelirse (boş değer gibi) Dengeli'ye dön
         if secili_rol not in rol_isimleri: secili_rol = "⚖️ Dengeli"
         
         if secili_rol == "⚖️ Dengeli": 
@@ -267,7 +269,6 @@ if file:
         selected_all = [selected] + st.multiselect("Kıyaslanacaklar:", [p for p in f_df['Player'].tolist() if p != selected], max_selections=3)
         p = f_df[f_df['Player'] == selected].iloc[0]
         
-        # Güvenli erişim
         p_pref = p['Rol_Secimi']
         if p_pref not in rol_isimleri: p_pref = "⚖️ Dengeli"
         aktif_rol_str = rol_isimleri[p_pref]
@@ -290,7 +291,6 @@ if file:
         if role_map[role]['bench'] in mustermann:
             bench = mustermann[role_map[role]['bench']]
             
-            # Geçerli index bulma
             try:
                 current_idx = list(rol_isimleri.values()).index(aktif_rol_str)
             except:
@@ -319,7 +319,6 @@ if file:
         show_df = f_df[['Player', 'Age', 'Role', 'Rol_Secimi', 'IP_Score', 'OOP_Score', 'Scout_Puanı', 'VFM_Skoru', 'Price_Num']].copy()
         show_df.insert(0, ' Seç', False)
         
-        # Seçenekleri temiz ve string olarak zorla
         valid_roles = [str(r) for r in ana_mevki_listesi]
         valid_prefs = [str(k) for k in rol_isimleri.keys()]
         
@@ -327,10 +326,10 @@ if file:
             " Seç": st.column_config.CheckboxColumn("Seç", help="Toplu işlem için oyuncuları seçin"),
             "Role": st.column_config.SelectboxColumn("Mevki", options=valid_roles, required=True, help="Oyuncunun ana analiz grubunu manuel seçin"),
             "Rol_Secimi": st.column_config.SelectboxColumn("🔄 Tercih", options=valid_prefs, required=True, help="Profil değiştirince Puan güncellenir"),
-            "IP_Score": st.column_config.ProgressColumn("⚔️ IP", help=stat_yardim["IP_Score"], format="%.1f", min_value=0, max_value=200),
-            "OOP_Score": st.column_config.ProgressColumn("🛡️ OOP", help=stat_yardim["OOP_Score"], format="%.1f", min_value=0, max_value=200),
-            "Scout_Puanı": st.column_config.ProgressColumn("⭐ Puan", help=stat_yardim["Scout_Puanı"], format="%.1f", min_value=0, max_value=200),
-            "VFM_Skoru": st.column_config.NumberColumn("VFM", help=stat_yardim["VFM_Skoru"]),
+            "IP_Score": st.column_config.ProgressColumn("⚔️ IP", format="%.1f", min_value=0, max_value=200),
+            "OOP_Score": st.column_config.ProgressColumn("🛡️ OOP", format="%.1f", min_value=0, max_value=200),
+            "Scout_Puanı": st.column_config.ProgressColumn("⭐ Puan", format="%.1f", min_value=0, max_value=200),
+            "VFM_Skoru": st.column_config.NumberColumn("VFM"),
             "Price_Num": st.column_config.NumberColumn("Bonservis (€)", format="%d")
         }, disabled=["Player", "Age", "IP_Score", "OOP_Score", "Scout_Puanı", "VFM_Skoru"], use_container_width=True, hide_index=True, height=450)
         
@@ -350,7 +349,6 @@ if file:
             for idx, row in edited_df.iterrows():
                 p_name = row['Player']
                 changed = False
-                # Boş değerleri engellemek için kontrol
                 if row['Role'] and row['Role'] in valid_roles:
                     if st.session_state.player_base_roles.get(p_name) != row['Role']:
                         st.session_state.player_base_roles[p_name] = row['Role']
@@ -382,7 +380,7 @@ if file:
     final_bottom_df = pd.concat(top_dfs + [rest_df]).reset_index(drop=True)
     num_cols = [c for c in df.columns if any(x in c for x in ['/90', '%']) and c != 'NP-xG/90']
     
-    pool_config = {s: st.column_config.NumberColumn(s, help=stat_yardim.get(s, "İst.")) for s in num_cols}
+    pool_config = {s: st.column_config.NumberColumn(s) for s in num_cols}
     pool_config["Player"] = st.column_config.TextColumn("Player", width="large")
 
     def style_dataframe(data):
