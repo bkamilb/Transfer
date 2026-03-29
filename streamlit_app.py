@@ -128,44 +128,56 @@ def parse_price(v):
     except: return 0.0
 
 def get_role(pos, sec_pos=""):
-    # Position ve Sec. Position bilgilerini birleştiriyoruz.
     combined = (str(pos) + " " + str(sec_pos)).upper()
     
-    # Mevki varlıklarını kontrol et (Secondary position da dahil)
+    # 1. Temel Bölge Tespitleri
+    # AM (RLC) veya M (RLC) gibi durumlarda dize içindeki harfleri hassas yakalamak için:
+    has_am_zone = "AM " in combined or "AM/" in combined or "AMR" in combined or "AML" in combined or "AMC" in combined
+    has_m_zone = "M " in combined or "M/" in combined or "MR" in combined or "ML" in combined or "MC" in combined
+    
+    # 2. Yön Tespitleri (AMRLC gibi hibritlerde R, L ve C var mı?)
+    # AM (RLC) yazımında AM ve parantez içindeki harfleri kontrol ediyoruz.
+    # Örnek: "AM (RLC)" -> AM zone içinde R, L ve C var.
+    has_r_direction = any(x in combined for x in ["(R", "R)", "R,", "RC", "RL", "AMR", "MR"])
+    has_l_direction = any(x in combined for x in ["(L", "L)", "L,", "LC", "RL", "AML", "ML"])
+    has_c_direction = any(x in combined for x in ["(C", "C)", "C,", "RC", "LC", "AMC", "MC", "S (C", "ST (C", "D (C"])
+
+    # 3. Kategori Bayrakları
+    has_kanat_mevki = (has_am_zone or has_m_zone) and (has_r_direction or has_l_direction)
+    has_amc = has_am_zone and has_c_direction
+    has_fwd = any(k in combined for k in ["ST", "S (C)", "ST (C)"])
     has_side_def = any(x in combined for x in ["D (R", "D (L", "D (RL"])
     has_stoper = "D (C)" in combined
     has_wb = "WB (" in combined
-    
-    # Kanat Şartı: AMR, AML, MR, ML bunlardan biri yoksa Kanat OLAMAZ.
-    has_kanat_mevki = any(k in combined for k in ["AM (R)", "AM (L)", "M (R)", "M (L)", "W (", "AMR", "AML"])
-    
-    has_amc = any(k in combined for k in ["AM (C)", "AMC"])
-    has_fwd = any(k in combined for k in ["ST", "S (C)", "ST (C)"])
     has_dm = "DM" in combined
     has_gk = "GK" in combined
 
-    # --- ÖZEL TWEAK KURALLARI (Hibritler) ---
-    if has_kanat_mevki:
-        # Bek + Kanat + Forvet -> Kanat
-        if has_side_def and has_fwd: return "Kanat"
-        # Kanat + AM + Forvet -> Kanat
-        if has_amc and has_fwd: return "Kanat"
-        # Bek + Kanat Bek + Kanat + AMC -> Kanat
-        if has_side_def and has_wb and has_amc: return "Kanat"
-    
-    # Bek + Kanat Bek + Kanat (AMC yoksa) -> Bek
-    if has_side_def and has_wb and has_kanat_mevki and not has_amc: return "Bek"
+    # --- HİYERARŞİ VE TWEAK KURALLARI ---
 
-    # --- GENEL ÖNCELİK HIYERARŞISI (Ne varsa o!) ---
+    # KURAL: AMC de varsa (örneğin AMRLC) Kanat hiyerarşisi her zaman önceliklidir (Bek/WB olsa bile)
+    if has_kanat_mevki:
+        # AMC varsa doğrudan Kanat
+        if has_amc: return "Kanat"
+        # AMC yoksa ama Forvet veya Bek kombinasyonu varsa yine Kanat (Winger-Forward hibriti)
+        if has_fwd or has_side_def: return "Kanat"
+        # Saf kanat (AMR, ML vb.)
+        return "Kanat"
+    
+    # KURAL: Bek + Kanat Bek + Kanat (AMC YOKSA) -> Bek
+    # Not: Yukarıdaki if kanat mevkisi varsa çalışacağı için, 
+    # AMRLC gibi AMC'li oyuncular zaten yukarıda "Kanat" olarak elenecek.
+    if has_side_def and has_wb and has_kanat_mevki and not has_amc: 
+        return "Bek"
+
+    # --- GENEL ÖNCELİK SIRALAMASI (Ne varsa ona göre) ---
     if has_fwd: return "Forvet"
-    if has_kanat_mevki: return "Kanat"
     if has_amc: return "AM"
     if has_dm: return "DM"
     if has_stoper: return "Stoper"
     if has_gk: return "Kaleci"
     if has_side_def: return "Bek"
     
-    return "Bek" # Hiçbiri yoksa varsayılan
+    return "Bek" # Varsayılan
 
 RADAR_COLORS = ['#00f2ff', '#ff0055', '#00ff66', '#ffaa00']
 
