@@ -127,19 +127,19 @@ def get_mustermann_color(val, stat_name, role):
     clean_target = clean_key(stat_name)
     matched_key = next((k for k in mustermann[bench_key].keys() if clean_key(k) == clean_target), None)
 
-    if not matched_key: return "background-color: #1a1a1a; color: #555;"
+    if not matched_key: return "background-color: #1a1a1a; color: #555555;"
     thresh = mustermann[bench_key][matched_key]
     
     if "lost" in matched_key.lower():
-        if v <= thresh[3]: return "background-color: #6a0dad; color: white;" 
-        if v <= thresh[2]: return "background-color: #2e7d32; color: white;" 
-        if v <= thresh[1]: return "background-color: #fbc02d; color: black;" 
-        return "background-color: #c62828; color: white;" 
+        if v <= thresh[3]: return "background-color: #6a0dad; color: #ffffff;" 
+        if v <= thresh[2]: return "background-color: #2e7d32; color: #ffffff;" 
+        if v <= thresh[1]: return "background-color: #fbc02d; color: #000000;" 
+        return "background-color: #c62828; color: #ffffff;" 
     
-    if v >= thresh[3]: return "background-color: #6a0dad; color: white;" 
-    if v >= thresh[2]: return "background-color: #2e7d32; color: white;" 
-    if v >= thresh[1]: return "background-color: #fbc02d; color: black;" 
-    return "background-color: #c62828; color: white;" 
+    if v >= thresh[3]: return "background-color: #6a0dad; color: #ffffff;" 
+    if v >= thresh[2]: return "background-color: #2e7d32; color: #ffffff;" 
+    if v >= thresh[1]: return "background-color: #fbc02d; color: #000000;" 
+    return "background-color: #c62828; color: #ffffff;" 
 
 def parse_price(v):
     if pd.isna(v) or v == "" or v == "-": return 0.0
@@ -165,7 +165,7 @@ def get_role(pos):
 RADAR_COLORS = ['#00f2ff', '#ff0055', '#00ff66', '#ffaa00']
 
 # --- 4. STREAMLIT UI ---
-st.set_page_config(layout="wide", page_title="Moneyball Ultimate v20")
+st.set_page_config(layout="wide", page_title="Moneyball Ultimate")
 st.markdown("""
 <style>
     .main { background-color: #0E1117; color: white; }
@@ -253,25 +253,24 @@ if file:
         for i, p_name in enumerate(selected_all):
             legend_html += f"<div style='color: {RADAR_COLORS[i]}; font-weight: bold; margin-top: 3px;'>■ {p_name}</div>"
 
-        # Kıyas Listesi Başlığı Dinamik Hale Geldi (v19/v20 Tweak)
+        # Kıyas Listesi Başlığı
         if len(selected_all) > 1:
-            kiyas_baslik = "<div style='color: #aaa; margin-bottom: 5px; border-bottom: 1px solid #333; padding-bottom: 3px; font-size: 10px; text-transform: uppercase;'>Kıyas Listesi</div>"
+            kiyas_baslik = "<div style='color: #aaaaaa; margin-bottom: 5px; border-bottom: 1px solid #333333; padding-bottom: 3px; font-size: 10px; text-transform: uppercase;'>Kıyas Listesi</div>"
         else:
-            kiyas_baslik = "" # Tek oyuncu seçiliyken sadece adı yazar
+            kiyas_baslik = ""
 
-        # HATA DÜZELTİLDİ: Metin sola yaslandı (Girintiler kaldırıldı) (v20 Fix)
-        metrics_html = f"""<div style='display: flex; background-color:#161a24; padding:15px; border-radius:8px; margin-bottom:15px; border:1px solid #333; justify-content: space-between; align-items: center;'>
+        metrics_html = f"""<div style='display: flex; background-color:#161a24; padding:15px; border-radius:8px; margin-bottom:15px; border:1px solid #333333; justify-content: space-between; align-items: center;'>
 <div style='display: flex; gap: 30px;'>
 <div style='text-align: center;'>
-<div style='font-size:12px; color:#aaa; margin-bottom: 5px;'>Puan ({aktif_rol_str})</div>
+<div style='font-size:12px; color:#aaaaaa; margin-bottom: 5px;'>Puan ({aktif_rol_str})</div>
 <div style='font-size:28px; font-weight:bold; color:#00f2ff;'>{round(p['Scout_Puanı'], 1)}</div>
 </div>
 <div style='text-align: center;'>
-<div style='font-size:12px; color:#aaa; margin-bottom: 5px;'>VFM Skoru</div>
+<div style='font-size:12px; color:#aaaaaa; margin-bottom: 5px;'>VFM Skoru</div>
 <div style='font-size:28px; font-weight:bold; color:#ff0055;'>{p['VFM_Skoru']}</div>
 </div>
 </div>
-<div style='text-align: left; font-size: 12px; background-color: #0e1117; padding: 10px; border-radius: 5px; border: 1px solid #222; min-width: 140px;'>
+<div style='text-align: left; font-size: 12px; background-color: #0e1117; padding: 10px; border-radius: 5px; border: 1px solid #222222; min-width: 140px;'>
 {kiyas_baslik}
 {legend_html}
 </div>
@@ -282,7 +281,7 @@ if file:
         role = p['Role']
         bench = mustermann[role_map[role]['bench']]
         
-        st.markdown("<div style='text-align: center; color: #aaa; font-size: 14px; margin-bottom: 5px;'>Radar Görünümü</div>", unsafe_allow_html=True)
+        st.markdown("<div style='text-align: center; color: #aaaaaa; font-size: 14px; margin-bottom: 5px;'>Radar Görünümü</div>", unsafe_allow_html=True)
         g_profili = st.radio("Radar Görünümü", ["⚖️ Dengeli", "⚔️ IP (Hücum)", "🛡️ OOP (Svn)"], horizontal=True, label_visibility="collapsed", index=list(rol_isimleri.values()).index(aktif_rol_str))
         grafik_aktif_rol = rol_isimleri[g_profili]
 
@@ -311,7 +310,6 @@ if file:
             angles += angles[:1]
             vals = [min(100, v) for v in r_data.values()] + [min(100, list(r_data.values())[0])]
             
-            # Ana oyuncu marker 'o', diğerleri 'x' vs. olabilir. Şeffaflık ayarı
             alpha_val = 0.3 if i == 0 else 0.2
             marker_style = 'o' if i == 0 else 'X'
             
@@ -319,7 +317,7 @@ if file:
             ax.plot(angles, vals, color=RADAR_COLORS[i], linewidth=2, marker=marker_style, markersize=5)
 
         ax.set_xticks(angles[:-1]); ax.set_xticklabels(labels, size=9, color='white', fontweight='bold')
-        ax.set_ylim(0, 100); ax.grid(True, color='#333', linestyle='--')
+        ax.set_ylim(0, 100); ax.grid(True, color='#333333', linestyle='--')
         
         st.pyplot(fig)
 
@@ -329,7 +327,6 @@ if file:
         show_df = f_df[['Player', 'Age', 'Role', 'IP_Score', 'OOP_Score', 'Rol_Secimi', 'Scout_Puanı', 'VFM_Skoru', 'Price_Num']].copy()
         show_df.rename(columns={'Price_Num': 'Bonservis (€)'}, inplace=True)
         
-        # mini barlar Streamlit altyapısında dinamik renk değiştiremez (v19 Note)
         edited_df = st.data_editor(
             show_df,
             column_config={
@@ -357,11 +354,10 @@ if file:
         # --- OYUN İÇİ PAZAR MATRİSİ (PUAN vs VFM) ---
         st.markdown("---")
         st.markdown("### 🌌 Oyuncu Pazar Matrisi (Puan & VFM)")
-        st.markdown("<span style='color:#aaa; font-size:13px;'>Sağ üst bölge elit ve kelepir oyuncuları (Yüksek Puan, Yüksek VFM) temsil eder. Renkli kutularla isimler eşleştirilmiştir.</span>", unsafe_allow_html=True)
+        st.markdown("<span style='color:#aaaaaa; font-size:13px;'>Sağ üst bölge elit ve kelepir oyuncuları (Yüksek Puan, Yüksek VFM) temsil eder. Renkli kutularla isimler eşleştirilmiştir.</span>", unsafe_allow_html=True)
         
         fig_scatter = go.Figure()
         
-        # 1. Seçili OLMAYAN oyuncuları silik ve BEYAZ çiz
         diger_df = f_df[~f_df['Player'].isin(selected_all)]
         fig_scatter.add_trace(go.Scatter(
             x=diger_df['Scout_Puanı'], y=diger_df['VFM_Skoru'],
@@ -372,28 +368,27 @@ if file:
             name='Diğer'
         ))
         
-        # 2. Seçili oyuncuları parlat (Overlap hatası giderildi (v20 Fix))
         for i, p_name in enumerate(selected_all):
             p_df = f_df[f_df['Player'] == p_name]
             if not p_df.empty:
-                # OVERLAP FIX: mode='markers' yapıldı (yazılar kaldırıldı), isimler Metrics kutusunun yanındaki legend'dan okunacak.
+                # İstenilen şık, yazısız elmas boncuk görünümü
                 fig_scatter.add_trace(go.Scatter(
                     x=p_df['Scout_Puanı'], y=p_df['VFM_Skoru'],
-                    mode='markers', # mode='markers+text' idi, textposition="top right" idi
-                    marker=dict(color=RADAR_COLORS[i], size=16, symbol='diamond', line=dict(color='white', width=1.5)),
-                    hovertemplate="<b>%{p_name}</b><br>Puan: %{x:.1f}<br>VFM: %{y:.1f}<extra></extra>",
+                    mode='markers',
+                    marker=dict(color=RADAR_COLORS[i], size=16, symbol='diamond', line=dict(color='#ffffff', width=1.5)),
+                    text=p_df['Player'],
+                    hovertemplate="<b>%{text}</b><br>Puan: %{x:.1f}<br>VFM: %{y:.1f}<extra></extra>",
                     name=p_name
                 ))
                 
-        # Medyan Çizgileri (Kalın ve Belirgin)
         x_mid = f_df['Scout_Puanı'].mean()
         y_mid = f_df['VFM_Skoru'].mean()
         fig_scatter.add_vline(x=x_mid, line_dash="dash", line_color="rgba(255, 255, 255, 0.4)", line_width=2)
         fig_scatter.add_hline(y=y_mid, line_dash="dash", line_color="rgba(255, 255, 255, 0.4)", line_width=2)
         
-        # Quadrant İsimleri (Sabit köşelerde kaldı)
-        fig_scatter.add_annotation(x=1, y=1, xref="paper", yref="paper", text="Elit & Kelepir", showarrow=False, font=dict(color="#00ff66", size=12), xanchor="right", yanchor="top", opacity=0.8)
-        fig_scatter.add_annotation(x=0, y=0, xref="paper", yref="paper", text="Zayıf & Pahalı", showarrow=False, font=dict(color="#ff0055", size=12), xanchor="left", yanchor="bottom", opacity=0.8)
+        # Temiz ve köşe uçlarına sabitlenmiş bilgilendirme yazıları
+        fig_scatter.add_annotation(x=1, y=1, xref="paper", yref="paper", text="Elit & Kelepir", showarrow=False, font=dict(color="#00ff66", size=11), xanchor="right", yanchor="bottom")
+        fig_scatter.add_annotation(x=0, y=0, xref="paper", yref="paper", text="Zayıf & Pahalı", showarrow=False, font=dict(color="#ff0055", size=11), xanchor="left", yanchor="top")
         
         fig_scatter.update_layout(
             template="plotly_dark",
@@ -412,7 +407,9 @@ if file:
     
     top_dfs = [f_df[f_df['Player'] == p_name] for p_name in selected_all]
     rest_df = f_df[~f_df['Player'].isin(selected_all)].sort_values('Scout_Puanı', ascending=False)
-    final_bottom_df = pd.concat(top_dfs + [rest_df])
+    
+    # BULUT SUNUCUSU İÇİN KESİN ÇÖZÜM: İndeksler sıfırlandı
+    final_bottom_df = pd.concat(top_dfs + [rest_df]).reset_index(drop=True)
     
     num_cols = [c for c in df.columns if any(x in c for x in ['/90', '%'])]
     deep_cols = ['Player', 'Role', 'Rol_Secimi'] + num_cols
@@ -424,16 +421,17 @@ if file:
                 if row['Player'] in selected_all:
                     idx = selected_all.index(row['Player'])
                     c = RADAR_COLORS[idx]
-                    styles.append(f'background-color: #1a2a3a; border-left: 4px solid {c}; color: {c}; font-weight: bold;')
+                    styles.append(f'background-color: #1a2a3a; color: {c}; font-weight: bold;')
                 else:
-                    styles.append('background-color: #161a24; color: #fff;')
+                    styles.append('background-color: #161a24; color: #ffffff;')
             elif col in ['Role', 'Rol_Secimi']:
-                styles.append('background-color: #161a24; color: #aaa;')
+                styles.append('background-color: #161a24; color: #aaaaaa;')
             else:
                 styles.append(get_mustermann_color(row[col], col, row['Role']))
         return styles
 
-    st.dataframe(final_bottom_df[deep_cols].style.apply(apply_final_styling, axis=1), use_container_width=True)
+    # BULUT SUNUCUSU İÇİN KESİN ÇÖZÜM 2: hide_index=True eklendi
+    st.dataframe(final_bottom_df[deep_cols].style.apply(apply_final_styling, axis=1), use_container_width=True, hide_index=True)
     
     st.markdown("""
     <div style="display: flex; gap: 15px; justify-content: center; margin-top: 15px; font-weight: bold;">
