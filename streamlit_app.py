@@ -88,6 +88,8 @@ stat_yardim = {
 
 # --- 2. DİNAMİK PROFİLLER ---
 rol_isimleri = {"⚖️ Dengeli": "Dengeli", "⚔️ IP (Hücum)": "IP (Hücum)", "🛡️ OOP (Svn)": "OOP (Savunma)"}
+ana_mevki_listesi = ["Kaleci", "Stoper", "Bek", "DM", "AM", "Kanat", "Forvet"]
+
 role_map = {
     "Kaleci": {"bench": "GK", "weights": {"Dengeli": {"Poss Won/90": 1.0, "Ps A/90": 0.8}, "IP (Hücum)": {"Ps A/90": 1.5, "Pr passes/90": 1.2}, "OOP (Savunma)": {"Poss Won/90": 1.5, "Ps A/90": 0.5}}},
     "Stoper": {"bench": "DEF", "weights": {"Dengeli": {"Tck A/90": 1.0, "Int/90": 1.0, "Aer A/90": 0.9, "Ps A/90": 0.5}, "IP (Hücum)": {"Ps A/90": 1.5, "Pr passes/90": 1.2, "Int/90": 0.8, "Tck A/90": 0.5}, "OOP (Savunma)": {"Tck A/90": 1.5, "Int/90": 1.5, "Aer A/90": 1.2, "Blk/90": 1.0, "Clr/90": 0.8}}},
@@ -137,14 +139,18 @@ def parse_price(v):
     try: return float(re.sub(r'[^\d.]', '', v.replace(',', '.'))) * mult
     except: return 0.0
 
-def get_role(pos):
-    pos = str(pos)
-    if "GK" in pos: return "Kaleci"
-    if any(k in pos for k in ["ST", "S (C)"]): return "Forvet"
-    if any(k in pos for k in ["AM (R)", "AM (L)", "M (R)", "M (L)"]): return "Kanat"
-    if "AM (C)" in pos: return "AM"
-    if "DM" in pos: return "DM"
-    if "D (C)" in pos: return "Stoper"
+def get_role(pos, sec_pos=""):
+    # Position ve Sec. Position verilerini birleştirip analiz ediyoruz.
+    # Savunmadan hücuma dizilim kuralı gereği, tarama sırasını en hücumcu rolden başlatıyoruz.
+    combined = (str(pos) + " " + str(sec_pos)).upper()
+    
+    # Öncelik Sırası: En Hücumcu -> En Savunmacı
+    if any(k in combined for k in ["ST", "S (C)", "ST (C)"]): return "Forvet"
+    if any(k in combined for k in ["AM (R)", "AM (L)", "M (R)", "M (L)", "W (", "AMR", "AML"]): return "Kanat"
+    if "AM (C)" in combined: return "AM"
+    if "DM" in combined: return "DM"
+    if "D (C)" in combined: return "Stoper"
+    if "GK" in combined: return "Kaleci"
     return "Bek"
 
 RADAR_COLORS = ['#00f2ff', '#ff0055', '#00ff66', '#ffaa00']
@@ -158,11 +164,26 @@ file = st.file_uploader("FM Export CSV'sini Yükle", type="csv")
 if file:
     df = pd.read_csv(file, sep=";")
     df['Minutes'] = df['Minutes'].apply(lambda x: x if x > 0 else 1)
-    df['Role'] = df['Position'].apply(get_role)
     df['Price_Num'] = df['Transfer Value'].apply(parse_price)
     if 'Tck A' in df.columns: df['Tck A/90'] = (df['Tck A'].apply(to_num) * 90) / df['Minutes']
-    if 'player_roles' not in st.session_state: st.session_state.player_roles = {}
-    df['Rol_Secimi'] = df['Player'].apply(lambda x: st.session_state.player_roles.get(x, "⚖️ Dengeli"))
+    
+    # Session State Yönetimi
+    if 'player_preferences' not in st.session_state: st.session_state.player_preferences = {}
+    if 'player_base_roles' not in st.session_state: st.session_state.player_base_roles = {}
+    
+    # Varsayılanları ata
+    for idx, row in df.iterrows():
+        p_name = row['Player']
+        if p_name not in st.session_state.player_base_roles:
+            # Sec. Position sütunu varsa onu da gönderiyoruz
+            sec_pos_val = row.get('Sec. Position', "")
+            st.session_state.player_base_roles[p_name] = get_role(row['Position'], sec_pos_val)
+        if p_name not in st.session_state.player_preferences:
+            st.session_state.player_preferences[p_name] = "⚖️ Dengeli"
+
+    # Kullanıcı seçimlerini DF'ye yansıt
+    df['Role'] = df['Player'].apply(lambda x: st.session_state.player_base_roles.get(x, "Bek"))
+    df['Rol_Secimi'] = df['Player'].apply(lambda x: st.session_state.player_preferences.get(x, "⚖️ Dengeli"))
 
     st.sidebar.header("🎯 Strateji & Bütçe")
     strategy = st.sidebar.radio("Strateji", ["Kâr Odaklı (Geliştir-Sat)", "Performans (Glory)"])
@@ -183,17 +204,14 @@ if file:
                     if target_key: scores.append((to_num(row[s]) / bench[target_key][3]) * 100 * w)
             results[prof_name] = np.mean(scores) if scores else 0
         
-        # 1. Lig Katsayısı (Division)
         league_name = row.get('Division', 'Unknown')
         multiplier = LEAGUE_RANKING_MULTIPLIERS.get(league_name, LEAGUE_RANKING_MULTIPLIERS["DEFAULT"])
         
-        # 2. Çoklu Karakter/Kişilik Çarpanı (Virgülle ayrılmış değerleri işler)
         raw_char = str(row.get('Personality', row.get('Media Handling', 'Balanced')))
         traits = [t.strip() for t in raw_char.split(',')]
         char_mults = [CHARACTER_MULTIPLIERS.get(t, 1.0) for t in traits if t != 'None']
         char_multiplier = np.mean(char_mults) if char_mults else 1.0
         
-        # 3. Hibrit Puanlama Mantığı
         secili_rol = row['Rol_Secimi']
         if secili_rol == "⚖️ Dengeli": 
             final_raw = results["Dengeli_Ham"]
@@ -202,13 +220,11 @@ if file:
         else: 
             final_raw = (results["Dengeli_Ham"] * 0.7) + (results["OOP_Ham"] * 0.3)
         
-        # 4. Nihai Çarpımlar
         total_mult = multiplier * char_multiplier
         final_scout = final_raw * total_mult
         ip_final = results["IP_Ham"] * total_mult
         oop_final = results["OOP_Ham"] * total_mult
         
-        # 5. Yaş Bonusu (Potansiyel)
         bonus = max(0, (23 - row['Age']) * 5) if strategy == "Kâr Odaklı (Geliştir-Sat)" else 0
         
         return pd.Series([final_scout + bonus, ip_final + bonus, oop_final + bonus])
@@ -262,36 +278,43 @@ if file:
 
     with col_m:
         st.markdown("### 📋 Oyuncu Analiz Masası")
-        # Analiz masası için veriyi hazırla ve seçim sütunu ekle
-        show_df = f_df[['Player', 'Age', 'Role', 'IP_Score', 'OOP_Score', 'Rol_Secimi', 'Scout_Puanı', 'VFM_Skoru', 'Price_Num']].copy()
+        show_df = f_df[['Player', 'Age', 'Role', 'Rol_Secimi', 'IP_Score', 'OOP_Score', 'Scout_Puanı', 'VFM_Skoru', 'Price_Num']].copy()
         show_df.insert(0, ' Seç', False)
         
         edited_df = st.data_editor(show_df, column_config={
             " Seç": st.column_config.CheckboxColumn("Seç", help="Toplu işlem için oyuncuları seçin"),
+            "Role": st.column_config.SelectboxColumn("Mevki", options=ana_mevki_listesi, help="Oyuncunun ana analiz grubunu manuel seçin"),
+            "Rol_Secimi": st.column_config.SelectboxColumn("🔄 Tercih", help="Profil değiştirince Puan güncellenir", options=list(rol_isimleri.keys())),
             "IP_Score": st.column_config.ProgressColumn("⚔️ IP", help=stat_yardim["IP_Score"], format="%.1f", min_value=0, max_value=200),
             "OOP_Score": st.column_config.ProgressColumn("🛡️ OOP", help=stat_yardim["OOP_Score"], format="%.1f", min_value=0, max_value=200),
-            "Rol_Secimi": st.column_config.SelectboxColumn("🔄 Tercih", help="Profil değiştirince Puan güncellenir", options=list(rol_isimleri.keys())),
             "Scout_Puanı": st.column_config.ProgressColumn("⭐ Puan", help=stat_yardim["Scout_Puanı"], format="%.1f", min_value=0, max_value=200),
             "VFM_Skoru": st.column_config.NumberColumn("VFM", help=stat_yardim["VFM_Skoru"]),
             "Price_Num": st.column_config.NumberColumn("Bonservis (€)", format="%d")
-        }, disabled=["Player", "Age", "Role", "IP_Score", "OOP_Score", "Scout_Puanı", "VFM_Skoru"], use_container_width=True, hide_index=True, height=450)
+        }, disabled=["Player", "Age", "IP_Score", "OOP_Score", "Scout_Puanı", "VFM_Skoru"], use_container_width=True, hide_index=True, height=450)
         
-        # Tekli veya toplu değişiklik kontrolü
         selected_for_batch = edited_df[edited_df[' Seç'] == True]['Player'].tolist()
         
         if selected_for_batch:
-            st.info(f"⚡ {len(selected_for_batch)} oyuncu seçildi. Aşağıdan toplu tercih değiştirebilirsiniz.")
-            col_batch_1, col_batch_2 = st.columns([2, 1])
-            new_batch_pref = col_batch_1.selectbox("Yeni Tercih Uygula:", list(rol_isimleri.keys()), key="batch_selector")
-            if col_batch_2.button("Seçililere Uygula", use_container_width=True):
+            st.info(f"⚡ {len(selected_for_batch)} oyuncu seçildi. Toplu işlem yapabilirsiniz.")
+            col_b1, col_b2, col_b3 = st.columns([1, 1, 1])
+            new_role = col_b1.selectbox("Yeni Mevki:", ana_mevki_listesi, key="batch_role")
+            new_pref = col_b2.selectbox("Yeni Tercih:", list(rol_isimleri.keys()), key="batch_pref")
+            if col_b3.button("Seçililere Uygula", use_container_width=True):
                 for p_name in selected_for_batch:
-                    st.session_state.player_roles[p_name] = new_batch_pref
+                    st.session_state.player_base_roles[p_name] = new_role
+                    st.session_state.player_preferences[p_name] = new_pref
                 st.rerun()
         else:
-            # Sadece satır bazlı dropdown değişikliği varsa işle
             for idx, row in edited_df.iterrows():
-                if st.session_state.player_roles.get(row['Player']) != row['Rol_Secimi']: 
-                    st.session_state.player_roles[row['Player']] = row['Rol_Secimi']; st.rerun()
+                p_name = row['Player']
+                changed = False
+                if st.session_state.player_base_roles.get(p_name) != row['Role']:
+                    st.session_state.player_base_roles[p_name] = row['Role']
+                    changed = True
+                if st.session_state.player_preferences.get(p_name) != row['Rol_Secimi']:
+                    st.session_state.player_preferences[p_name] = row['Rol_Secimi']
+                    changed = True
+                if changed: st.rerun()
 
         st.markdown("---")
         st.markdown("### 🌌 Oyuncu Pazar Matrisi (Scout Puanı & VFM)")
@@ -304,22 +327,15 @@ if file:
         
         s_mid, v_mid = (f_df['Scout_Puanı'].max() + f_df['Scout_Puanı'].min()) / 2.0, (f_df['VFM_Skoru'].max() + f_df['VFM_Skoru'].min()) / 2.0
         fig_scatter.add_vline(x=s_mid, line_dash="dash", line_color="rgba(255, 255, 255, 0.4)"); fig_scatter.add_hline(y=v_mid, line_dash="dash", line_color="rgba(255, 255, 255, 0.4)")
-        
-        fig_scatter.add_annotation(x=1, y=1, xref="paper", yref="paper", text="ELİT (Cevher)", showarrow=False, font=dict(color="#00ff66", size=12), xanchor="right", yanchor="bottom")
-        fig_scatter.add_annotation(x=0, y=0, xref="paper", yref="paper", text="RİSKLİ (Verimsiz)", showarrow=False, font=dict(color="#ff0055", size=12), xanchor="left", yanchor="top")
-        fig_scatter.add_annotation(x=1, y=0, xref="paper", yref="paper", text="LÜKS (Yıldız)", showarrow=False, font=dict(color="#ffaa00", size=12), xanchor="right", yanchor="top")
-        fig_scatter.add_annotation(x=0, y=1, xref="paper", yref="paper", text="FIRSAT (Yatırımlık)", showarrow=False, font=dict(color="#00f2ff", size=12), xanchor="left", yanchor="bottom")
-        
-        fig_scatter.update_layout(template="plotly_dark", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', margin=dict(l=20, r=20, t=30, b=20), xaxis_title="Scout Puanı", yaxis_title="VFM Skoru", showlegend=False, height=400); st.plotly_chart(fig_scatter, use_container_width=True)
+        fig_scatter.update_layout(template="plotly_dark", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', margin=dict(l=20, r=20, t=30, b=20), xaxis_title="Scout Puanı", yaxis_title="VFM Skoru", height=400); st.plotly_chart(fig_scatter, use_container_width=True)
 
     st.divider(); st.subheader(f"📊 Karşılaştırmalı Veri Havuzu (Tam Detay)")
     top_dfs = [f_df[f_df['Player'] == p_name] for p_name in selected_all]
     rest_df = f_df[~f_df['Player'].isin(selected_all)].sort_values('Scout_Puanı', ascending=False)
     final_bottom_df = pd.concat(top_dfs + [rest_df]).reset_index(drop=True)
-    # NP-xG/90'ı listeye dahil etme
     num_cols = [c for c in df.columns if any(x in c for x in ['/90', '%']) and c != 'NP-xG/90']
     
-    pool_config = {s: st.column_config.NumberColumn(s, help=stat_yardim.get(s, "İstatistik detayı")) for s in num_cols}
+    pool_config = {s: st.column_config.NumberColumn(s, help=stat_yardim.get(s, "İst.")) for s in num_cols}
     pool_config["Player"] = st.column_config.TextColumn("Player", width="large")
 
     def style_dataframe(data):
