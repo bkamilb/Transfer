@@ -43,25 +43,27 @@ mustermann = {
     }
 }
 
-# --- LİG KATSAYILARI (OPTA BAZLI) ---
-LEAGUE_RANKING_MULTIPLIERS = {
-    "Premier League": 1.00,
-    "Spanish First Division": 0.95,
-    "German Bundesliga": 0.95,
-    "Italian Serie A": 0.95,
-    "Ligue 1 McDonald's": 0.95,
-    "Portuguese Premier League": 0.90,
-    "Eredivisie": 0.90,
-    "Sky Bet Championship": 0.88,
-    "Belgian Jupiler Pro League": 0.88,
-    "Turkish Super League": 0.85,
-    "Brazilian National First Division": 0.85,
-    "Austrian Premier Division": 0.82,
-    "Scottish William Hill Premiership": 0.82,
-    "MLS": 0.80,
-    "Polish Ekstraklasa": 0.78,
-    "Turkish 1. League": 0.75,
-    "DEFAULT": 0.70
+# --- YARDIM/HOVER SÖZLÜĞÜ ---
+stat_yardim = {
+    "Blk/90": "Şut Engelleme: 90 dk başına rakip şutuna siper olma.",
+    "Clr/90": "Uzaklaştırma: 90 dk başına topu uzaklaştırma başarısı.",
+    "Int/90": "Pas Arası: 90 dk başına rakip pasını kesme başarısı.",
+    "Aer A/90": "Hava Topu Girişimi: 90 dk başına çıkılan kafa topu mücadelesi.",
+    "Hdr %": "Hava Topu Başarısı: Çıkılan hava toplarını kazanma yüzdesi.",
+    "Poss Won/90": "Top Kazanma: 90 dk başına rakip ayağından kazanılan toplar.",
+    "Ps A/90": "Pas İsabeti: 90 dk başına atılan başarılı pas sayısı.",
+    "Pr passes/90": "Progresif Pas: Takımı kaleye yaklaştıran dikine paslar.",
+    "Poss Lost/90": "Top Kaybı: 90 dk başına yapılan kritik top kaybı.",
+    "Drb/90": "Dripling: 90 dk başına başarılı adam geçme aksiyonu.",
+    "KP/90": "Kilit Pas: Şutla sonuçlanan veya savunma kıran paslar.",
+    "xA/90": "Beklenen Asist: Verilen pasların gol olma olasılığı değeri.",
+    "xG/90": "Beklenen Gol: Yakalanan pozisyonların gol olma olasılığı değeri.",
+    "Shot/90": "Şut: 90 dk başına rakip kaleye gönderilen şutlar.",
+    "Tck A/90": "Top Kapma Girişimi: 90 dk başına yapılan müdahale denemesi.",
+    "IP_Score": "Hücum Skoru: Top takımınızdayken oyuncunun toplam verimi.",
+    "OOP_Score": "Savunma Skoru: Top rakipteyken oyuncunun defans verimi.",
+    "Scout_Puanı": "Nihai Puan: Seçilen profile göre hesaplanan toplam kalite skoru.",
+    "VFM_Skoru": "Verimlilik (VFM): Scout puanının maliyete oranı."
 }
 
 # --- 2. DİNAMİK PROFİLLER ---
@@ -76,7 +78,7 @@ role_map = {
     "Forvet": {"bench": "FWD", "weights": {"Dengeli": {"xG/90": 1.0, "Shot/90": 1.0, "xA/90": 0.6}, "IP (Hücum)": {"xA/90": 1.5, "KP/90": 1.5, "xG/90": 0.8, "Ps A/90": 1.0}, "OOP (Savunma)": {"xG/90": 1.5, "Aer A/90": 1.5, "Poss Won/90": 1.2, "Shot/90": 1.2}}}
 }
 
-# --- 3. YARDIMCI FONKSİYONLAR ---
+# --- 3. FONKSİYONLAR ---
 def clean_key(text): return re.sub(r'[^a-zA-Z]', '', str(text)).lower()
 def to_num(val):
     if pd.isna(val): return 0.0
@@ -147,7 +149,7 @@ if file:
     min_v, max_v = int(df['Price_Num'].min()), int(df['Price_Num'].max())
     budget = st.sidebar.slider("Bonservis Aralığı", min_value=min_v, max_value=max_v, value=(min_v, max_v), step=100000)
 
-    # --- HESAPLAMA MOTORU ---
+    # --- HESAPLAMA MOTORU (HİBRİT %70/%30) ---
     def calc_scores(row):
         config = role_map[row['Role']]
         bench = mustermann.get(config['bench'], {})
@@ -160,27 +162,12 @@ if file:
                     target_key = next((k for k in bench.keys() if clean_key(k) == clean_key(s)), None)
                     if target_key: scores.append((to_num(row[s]) / bench[target_key][3]) * 100 * w)
             results[prof_name] = np.mean(scores) if scores else 0
-        
-        # Lig Katsayısı Entegrasyonu
-        league = row.get('League', 'Unknown')
-        multiplier = LEAGUE_RANKING_MULTIPLIERS.get(league, LEAGUE_RANKING_MULTIPLIERS["DEFAULT"])
-        
-        # Katsayı Bazlı Puanlama Mantığı (%70 Dengeli + %30 Rol)
-        secili_rol = row['Rol_Secimi']
-        if secili_rol == "⚖️ Dengeli": 
-            final_raw = results["Dengeli_Ham"]
-        elif secili_rol == "⚔️ IP (Hücum)": 
-            final_raw = (results["Dengeli_Ham"] * 0.7) + (results["IP_Ham"] * 0.3)
-        else: 
-            final_raw = (results["Dengeli_Ham"] * 0.7) + (results["OOP_Ham"] * 0.3)
-        
-        # Lig Çarpanı Uygulama
-        final_scout = final_raw * multiplier
-        
-        # Yaş Bonusu (Lig çarpanından sonra eklenir)
         bonus = max(0, (23 - row['Age']) * 5) if strategy == "Kâr Odaklı (Geliştir-Sat)" else 0
-        
-        return pd.Series([final_scout + bonus, results["IP_Ham"] + bonus, results["OOP_Ham"] + bonus])
+        secili_rol = row['Rol_Secimi']
+        if secili_rol == "⚖️ Dengeli": final_raw = results["Dengeli_Ham"]
+        elif secili_rol == "⚔️ IP (Hücum)": final_raw = (results["Dengeli_Ham"] * 0.7) + (results["IP_Ham"] * 0.3)
+        else: final_raw = (results["Dengeli_Ham"] * 0.7) + (results["OOP_Ham"] * 0.3)
+        return pd.Series([final_raw + bonus, results["IP_Ham"] + bonus, results["OOP_Ham"] + bonus])
 
     df[['Scout_Puanı', 'IP_Score', 'OOP_Score']] = df.apply(calc_scores, axis=1)
     df['VFM_Skoru'] = (df['Scout_Puanı'] / ((df['Price_Num'] / 1000000) + 1)).round(1) 
@@ -188,56 +175,96 @@ if file:
 
     col_m, col_s = st.columns([2, 1])
     with col_s:
-        st.subheader("🎯 Scout Kartı")
+        st.subheader("🎯 Scout Kartı & Kıyaslama")
         selected = st.selectbox("Ana Oyuncu:", f_df['Player'].tolist())
         selected_all = [selected] + st.multiselect("Kıyaslanacaklar:", [p for p in f_df['Player'].tolist() if p != selected], max_selections=3)
         p = f_df[f_df['Player'] == selected].iloc[0]
+        aktif_rol_str = rol_isimleri[p['Rol_Secimi']]
         
-        legend_html = "".join([f"<div style='color: {RADAR_COLORS[i]}; font-weight: bold;'>■ {p_name}</div>" for i, p_name in enumerate(selected_all)])
-        st.markdown(f"""<div style='background-color:#161a24; padding:15px; border-radius:8px; border:1px solid #333333; display: flex; justify-content: space-between;'><div><div style='font-size:12px; color:#aaa;'>Puan</div><div style='font-size:28px; font-weight:bold; color:#00f2ff;'>{round(p['Scout_Puanı'], 1)}</div></div><div><div style='font-size:12px; color:#aaa;'>VFM</div><div style='font-size:28px; font-weight:bold; color:#ff0055;'>{p['VFM_Skoru']}</div></div><div style='font-size:11px;'>{legend_html}</div></div>""", unsafe_allow_html=True)
+        badges = []
+        if p['VFM_Skoru'] >= 25.0: badges.append("💎 Kelepir")
+        if p['OOP_Score'] >= 80.0: badges.append("🧱 Duvar")
+        if p['IP_Score'] >= 80.0: badges.append("🪄 Maestro")
+        if p['Scout_Puanı'] >= 85.0: badges.append("⭐ Elit Sınıf")
+        if badges: st.markdown(f"<div style='margin-bottom: 10px; font-size: 14px;'><b>Rozetler:</b> {' | '.join(badges)}</div>", unsafe_allow_html=True)
+        
+        legend_html = "".join([f"<div style='color: {RADAR_COLORS[i]}; font-weight: bold; margin-top: 3px;'>■ {p_name}</div>" for i, p_name in enumerate(selected_all)])
+        st.markdown(f"""<div style='display: flex; background-color:#161a24; padding:15px; border-radius:8px; margin-bottom:15px; border:1px solid #333333; justify-content: space-between; align-items: center;'><div style='display: flex; gap: 30px;'><div style='text-align: center;'><div style='font-size:12px; color:#aaaaaa;'>Puan ({aktif_rol_str})</div><div style='font-size:28px; font-weight:bold; color:#00f2ff;'>{round(p['Scout_Puanı'], 1)}</div></div><div style='text-align: center;'><div style='font-size:12px; color:#aaaaaa;'>VFM Skoru</div><div style='font-size:28px; font-weight:bold; color:#ff0055;'>{p['VFM_Skoru']}</div></div></div><div style='text-align: left; font-size: 12px; background-color: #0e1117; padding: 10px; border-radius: 5px; border: 1px solid #222222; min-width: 140px;'>{legend_html}</div></div>""", unsafe_allow_html=True)
 
-        # Radar Grafiği
         role = p['Role']
-        bench = mustermann[role_map[role]['bench']]
-        radar_stats = list(role_map[role]['weights']["Dengeli"].keys())
-        fig, ax = plt.subplots(figsize=(4, 4), subplot_kw={"polar": True})
-        fig.patch.set_facecolor('#0E1117'); ax.set_facecolor('#161A24')
-        for i, p_name in enumerate(selected_all):
-            p_row = f_df[f_df['Player'] == p_name].iloc[0]
-            vals = [(to_num(p_row.get(s, 0)) / bench[next(k for k in bench.keys() if clean_key(k) == clean_key(s))][3]) * 100 for s in radar_stats]
-            vals += [vals[0]]; angles = np.linspace(0, 2*np.pi, len(radar_stats), endpoint=False).tolist() + [0]
-            ax.fill(angles, vals, color=RADAR_COLORS[i], alpha=0.2); ax.plot(angles, vals, color=RADAR_COLORS[i], linewidth=2)
-        ax.set_xticks(angles[:-1]); ax.set_xticklabels([s.replace("/90","") for s in radar_stats], color='white', size=8)
-        st.pyplot(fig)
+        if role_map[role]['bench'] in mustermann:
+            bench = mustermann[role_map[role]['bench']]
+            g_profili = st.radio("Radar Görünümü", ["⚖️ Dengeli", "⚔️ IP (Hücum)", "🛡️ OOP (Svn)"], horizontal=True, label_visibility="collapsed", index=list(rol_isimleri.values()).index(aktif_rol_str))
+            grafik_rol = rol_isimleri[g_profili]
+            radar_stats = list(set(list(role_map[role]['weights']["IP (Hücum)"].keys()) + list(role_map[role]['weights']["OOP (Savunma)"].keys()))) if grafik_rol == "Dengeli" else list(role_map[role]['weights'][grafik_rol].keys())
+            fig, ax = plt.subplots(figsize=(4, 4), subplot_kw={"polar": True})
+            fig.patch.set_facecolor('#0E1117'); ax.set_facecolor('#161A24')
+            for i, p_name in enumerate(selected_all):
+                p_row = f_df[f_df['Player'] == p_name].iloc[0]
+                r_data = {}
+                for stat in radar_stats:
+                    t_key = next((k for k in bench.keys() if clean_key(k) == clean_key(stat)), None)
+                    if t_key: r_data[stat.replace("/90", "")] = (to_num(p_row.get(stat, 0)) / bench[t_key][3]) * 100
+                labels = list(r_data.keys()); angles = np.linspace(0, 2*np.pi, len(labels), endpoint=False).tolist() + [0]
+                vals = [min(100, v) for v in r_data.values()] + [min(100, list(r_data.values())[0])]
+                ax.fill(angles, vals, color=RADAR_COLORS[i], alpha=0.3); ax.plot(angles, vals, color=RADAR_COLORS[i], linewidth=2, marker='o', markersize=5)
+            ax.set_xticks(angles[:-1]); ax.set_xticklabels(labels, size=9, color='white', fontweight='bold')
+            ax.tick_params(axis='x', pad=15); ax.set_yticks([20, 40, 60, 80, 100]); ax.set_ylim(0, 120); ax.grid(True, color='#333333', linestyle='--')
+            plt.tight_layout(pad=2.0); st.pyplot(fig)
 
     with col_m:
         st.markdown("### 📋 Oyuncu Analiz Masası")
         show_df = f_df[['Player', 'Age', 'Role', 'IP_Score', 'OOP_Score', 'Rol_Secimi', 'Scout_Puanı', 'VFM_Skoru', 'Price_Num']].copy()
-        edited_df = st.data_editor(show_df, column_config={
-            "Rol_Secimi": st.column_config.SelectboxColumn("🔄 Tercih", options=list(rol_isimleri.keys())),
-            "Scout_Puanı": st.column_config.ProgressColumn("⭐ Puan", format="%.1f", min_value=0, max_value=150),
-            "Price_Num": st.column_config.NumberColumn("Bonservis (€)", format="%d")
-        }, use_container_width=True, hide_index=True)
         
-        # Değişiklik kontrolü
+        # --- ANALİZ MASASI HOVER VE FORMAT ---
+        edited_df = st.data_editor(show_df, column_config={
+            "IP_Score": st.column_config.ProgressColumn("⚔️ IP", help=stat_yardim["IP_Score"], format="%.1f", min_value=0, max_value=200),
+            "OOP_Score": st.column_config.ProgressColumn("🛡️ OOP", help=stat_yardim["OOP_Score"], format="%.1f", min_value=0, max_value=200),
+            "Rol_Secimi": st.column_config.SelectboxColumn("🔄 Tercih", help="Profil değiştirince Puan güncellenir", options=list(rol_isimleri.keys())),
+            "Scout_Puanı": st.column_config.ProgressColumn("⭐ Puan", help=stat_yardim["Scout_Puanı"], format="%.1f", min_value=0, max_value=200),
+            "VFM_Skoru": st.column_config.NumberColumn("VFM", help=stat_yardim["VFM_Skoru"]),
+            "Price_Num": st.column_config.NumberColumn("Bonservis (€)", help="Sayısal sıralama için orijinal format korunmuştur.", format="%d")
+        }, disabled=["Player", "Age", "Role", "IP_Score", "OOP_Score", "Scout_Puanı", "VFM_Skoru"], use_container_width=True, hide_index=True, height=450)
+        
         for idx, row in edited_df.iterrows():
             if st.session_state.player_roles.get(row['Player']) != row['Rol_Secimi']: 
                 st.session_state.player_roles[row['Player']] = row['Rol_Secimi']; st.rerun()
 
-        st.markdown("### 🌌 Oyuncu Pazar Matrisi")
+        st.markdown("---")
+        st.markdown("### 🌌 Oyuncu Pazar Matrisi (Scout Puanı & VFM)")
         fig_scatter = go.Figure()
-        fig_scatter.add_trace(go.Scatter(x=f_df['Scout_Puanı'], y=f_df['VFM_Skoru'], mode='markers', marker=dict(color='white', size=6, opacity=0.4), text=f_df['Player'], name="Lig Geneli"))
-        
-        # Matris Bölgeleri Etiketleri
-        fig_scatter.add_annotation(x=f_df['Scout_Puanı'].max(), y=f_df['VFM_Skoru'].max(), text="ELİT (Cevher)", showarrow=False, font=dict(color="#00ff66"))
-        fig_scatter.add_annotation(x=f_df['Scout_Puanı'].min(), y=f_df['VFM_Skoru'].min(), text="RİSKLİ (Verimsiz)", showarrow=False, font=dict(color="#ff0055"))
-        fig_scatter.add_annotation(x=f_df['Scout_Puanı'].max(), y=f_df['VFM_Skoru'].min(), text="LÜKS (Yıldız)", showarrow=False, font=dict(color="#ffaa00"))
-        fig_scatter.add_annotation(x=f_df['Scout_Puanı'].min(), y=f_df['VFM_Skoru'].max(), text="FIRSAT (Yatırımlık)", showarrow=False, font=dict(color="#00f2ff"))
-        
-        fig_scatter.update_layout(template="plotly_dark", xaxis_title="Scout Puanı", yaxis_title="VFM Skoru", height=400, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
-        st.plotly_chart(fig_scatter, use_container_width=True)
+        d_plot = f_df[~f_df['Player'].isin(selected_all)]
+        fig_scatter.add_trace(go.Scatter(x=d_plot['Scout_Puanı'], y=d_plot['VFM_Skoru'], mode='markers', marker=dict(color='white', size=7, opacity=0.3), text=d_plot['Player'], hovertemplate="<b>%{text}</b><br>Puan: %{x:.1f}<br>VFM: %{y}<extra></extra>", name='Diğer'))
+        for i, p_name in enumerate(selected_all):
+            p_p = f_df[f_df['Player'] == p_name]
+            if not p_p.empty: fig_scatter.add_trace(go.Scatter(x=p_p['Scout_Puanı'], y=p_p['VFM_Skoru'], mode='markers', marker=dict(color=RADAR_COLORS[i], size=15, symbol='diamond', line=dict(color='#ffffff', width=1.5)), text=p_p['Player'], hovertemplate="<b>%{text}</b><br>Puan: %{x:.1f}<br>VFM: %{y}<extra></extra>", name=p_name))
+        s_mid, v_mid = (f_df['Scout_Puanı'].max() + f_df['Scout_Puanı'].min()) / 2.0, (f_df['VFM_Skoru'].max() + f_df['VFM_Skoru'].min()) / 2.0
+        fig_scatter.add_vline(x=s_mid, line_dash="dash", line_color="rgba(255, 255, 255, 0.4)"); fig_scatter.add_hline(y=v_mid, line_dash="dash", line_color="rgba(255, 255, 255, 0.4)")
+        fig_scatter.add_annotation(x=1, y=1, xref="paper", yref="paper", text="ELİT (Cevher)", showarrow=False, font=dict(color="#00ff66", size=12), xanchor="right", yanchor="bottom")
+        fig_scatter.add_annotation(x=0, y=0, xref="paper", yref="paper", text="RİSKLİ (Verimsiz)", showarrow=False, font=dict(color="#ff0055", size=12), xanchor="left", yanchor="top")
+        fig_scatter.add_annotation(x=1, y=0, xref="paper", yref="paper", text="LÜKS (Yıldız)", showarrow=False, font=dict(color="#ffaa00", size=12), xanchor="right", yanchor="top")
+        fig_scatter.add_annotation(x=0, y=1, xref="paper", yref="paper", text="FIRSAT (Yatırımlık)", showarrow=False, font=dict(color="#00f2ff", size=12), xanchor="left", yanchor="bottom")
+        fig_scatter.update_layout(template="plotly_dark", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', margin=dict(l=20, r=20, t=30, b=20), xaxis_title="Scout Puanı", yaxis_title="VFM Skoru", showlegend=False, height=400); st.plotly_chart(fig_scatter, use_container_width=True)
 
-    # Detaylı Veri Havuzu
-    st.divider(); st.subheader("📊 Karşılaştırmalı Veri Havuzu")
+    st.divider(); st.subheader(f"📊 Karşılaştırmalı Veri Havuzu (Tam Detay)")
+    top_dfs = [f_df[f_df['Player'] == p_name] for p_name in selected_all]
+    rest_df = f_df[~f_df['Player'].isin(selected_all)].sort_values('Scout_Puanı', ascending=False)
+    final_bottom_df = pd.concat(top_dfs + [rest_df]).reset_index(drop=True)
     num_cols = [c for c in df.columns if any(x in c for x in ['/90', '%'])]
-    st.dataframe(f_df[['Player', 'Role'] + num_cols].style.apply(lambda x: [get_mustermann_color(v, x.name, f_df.loc[i, 'Role']) for i, v in x.items()] if x.name in num_cols else ['']*len(x), axis=0), use_container_width=True, hide_index=True)
+    
+    # --- VERİ HAVUZU HOVER KONFİGÜRASYONU ---
+    pool_config = {s: st.column_config.NumberColumn(s, help=stat_yardim.get(s, "İstatistik detayı")) for s in num_cols}
+    pool_config["Player"] = st.column_config.TextColumn("Player", width="large")
+
+    def style_dataframe(data):
+        styles = pd.DataFrame('', index=data.index, columns=data.columns)
+        for i in data.index:
+            row = data.loc[i]; p_idx = selected_all.index(row['Player']) if row['Player'] in selected_all else -1
+            for col in data.columns:
+                if col == 'Player': styles.at[i, col] = f'background-color: #1a2a3a; color: {RADAR_COLORS[p_idx]}; font-weight: bold;' if p_idx != -1 else 'background-color: #161a24; color: #ffffff;'
+                elif col in ['Role', 'Rol_Secimi']: styles.at[i, col] = 'background-color: #161a24; color: #aaaaaa;'
+                else: styles.at[i, col] = get_mustermann_color(row[col], col, row['Role'])
+        return styles
+
+    st.dataframe(final_bottom_df[['Player', 'Role', 'Rol_Secimi'] + num_cols].style.apply(style_dataframe, axis=None), column_config=pool_config, use_container_width=True, hide_index=True)
+    st.markdown("<div style='display:flex;gap:15px;justify-content:center;font-weight:bold;margin-top:10px;'><div style='background:#6a0dad;padding:7px 15px;border-radius:4px;color:white;'>🟣 ELITE</div><div style='background:#2e7d32;padding:7px 15px;border-radius:4px;color:white;'>🟢 GOOD</div><div style='background:#fbc02d;padding:7px 15px;border-radius:4px;color:black;'>🟡 AVG</div><div style='background:#c62828;padding:7px 15px;border-radius:4px;color:white;'>🔴 POOR</div></div>", unsafe_allow_html=True)
