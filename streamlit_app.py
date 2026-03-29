@@ -262,9 +262,12 @@ if file:
 
     with col_m:
         st.markdown("### 📋 Oyuncu Analiz Masası")
+        # Analiz masası için veriyi hazırla ve seçim sütunu ekle
         show_df = f_df[['Player', 'Age', 'Role', 'IP_Score', 'OOP_Score', 'Rol_Secimi', 'Scout_Puanı', 'VFM_Skoru', 'Price_Num']].copy()
+        show_df.insert(0, ' Seç', False)
         
         edited_df = st.data_editor(show_df, column_config={
+            " Seç": st.column_config.CheckboxColumn("Seç", help="Toplu işlem için oyuncuları seçin"),
             "IP_Score": st.column_config.ProgressColumn("⚔️ IP", help=stat_yardim["IP_Score"], format="%.1f", min_value=0, max_value=200),
             "OOP_Score": st.column_config.ProgressColumn("🛡️ OOP", help=stat_yardim["OOP_Score"], format="%.1f", min_value=0, max_value=200),
             "Rol_Secimi": st.column_config.SelectboxColumn("🔄 Tercih", help="Profil değiştirince Puan güncellenir", options=list(rol_isimleri.keys())),
@@ -273,9 +276,22 @@ if file:
             "Price_Num": st.column_config.NumberColumn("Bonservis (€)", format="%d")
         }, disabled=["Player", "Age", "Role", "IP_Score", "OOP_Score", "Scout_Puanı", "VFM_Skoru"], use_container_width=True, hide_index=True, height=450)
         
-        for idx, row in edited_df.iterrows():
-            if st.session_state.player_roles.get(row['Player']) != row['Rol_Secimi']: 
-                st.session_state.player_roles[row['Player']] = row['Rol_Secimi']; st.rerun()
+        # Tekli veya toplu değişiklik kontrolü
+        selected_for_batch = edited_df[edited_df[' Seç'] == True]['Player'].tolist()
+        
+        if selected_for_batch:
+            st.info(f"⚡ {len(selected_for_batch)} oyuncu seçildi. Aşağıdan toplu tercih değiştirebilirsiniz.")
+            col_batch_1, col_batch_2 = st.columns([2, 1])
+            new_batch_pref = col_batch_1.selectbox("Yeni Tercih Uygula:", list(rol_isimleri.keys()), key="batch_selector")
+            if col_batch_2.button("Seçililere Uygula", use_container_width=True):
+                for p_name in selected_for_batch:
+                    st.session_state.player_roles[p_name] = new_batch_pref
+                st.rerun()
+        else:
+            # Sadece satır bazlı dropdown değişikliği varsa işle
+            for idx, row in edited_df.iterrows():
+                if st.session_state.player_roles.get(row['Player']) != row['Rol_Secimi']: 
+                    st.session_state.player_roles[row['Player']] = row['Rol_Secimi']; st.rerun()
 
         st.markdown("---")
         st.markdown("### 🌌 Oyuncu Pazar Matrisi (Scout Puanı & VFM)")
@@ -300,7 +316,8 @@ if file:
     top_dfs = [f_df[f_df['Player'] == p_name] for p_name in selected_all]
     rest_df = f_df[~f_df['Player'].isin(selected_all)].sort_values('Scout_Puanı', ascending=False)
     final_bottom_df = pd.concat(top_dfs + [rest_df]).reset_index(drop=True)
-    num_cols = [c for c in df.columns if any(x in c for x in ['/90', '%'])]
+    # NP-xG/90'ı listeye dahil etme
+    num_cols = [c for c in df.columns if any(x in c for x in ['/90', '%']) and c != 'NP-xG/90']
     
     pool_config = {s: st.column_config.NumberColumn(s, help=stat_yardim.get(s, "İstatistik detayı")) for s in num_cols}
     pool_config["Player"] = st.column_config.TextColumn("Player", width="large")
