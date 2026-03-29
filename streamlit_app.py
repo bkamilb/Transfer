@@ -192,7 +192,11 @@ if file:
 
     # --- HESAPLAMA MOTORU ---
     def calc_scores(row):
-        config = role_map[row['Role']]
+        # Mevki veya tercihin boş gelmesi durumunda patlamaması için kontrol
+        player_role = row.get('Role', "Bek")
+        if player_role not in role_map: player_role = "Bek"
+        
+        config = role_map[player_role]
         bench = mustermann.get(config['bench'], {})
         results = {}
         for dict_key, prof_name in [("Dengeli", "Dengeli_Ham"), ("IP (Hücum)", "IP_Ham"), ("OOP (Savunma)", "OOP_Ham")]:
@@ -212,7 +216,10 @@ if file:
         char_mults = [CHARACTER_MULTIPLIERS.get(t, 1.0) for t in traits if t != 'None']
         char_multiplier = np.mean(char_mults) if char_mults else 1.0
         
-        secili_rol = row['Rol_Secimi']
+        secili_rol = row.get('Rol_Secimi', "⚖️ Dengeli")
+        # Geçersiz bir tercih gelirse (boş değer gibi) Dengeli'ye dön
+        if secili_rol not in rol_isimleri: secili_rol = "⚖️ Dengeli"
+        
         if secili_rol == "⚖️ Dengeli": 
             final_raw = results["Dengeli_Ham"]
         elif secili_rol == "⚔️ IP (Hücum)": 
@@ -239,7 +246,11 @@ if file:
         selected = st.selectbox("Ana Oyuncu:", f_df['Player'].tolist())
         selected_all = [selected] + st.multiselect("Kıyaslanacaklar:", [p for p in f_df['Player'].tolist() if p != selected], max_selections=3)
         p = f_df[f_df['Player'] == selected].iloc[0]
-        aktif_rol_str = rol_isimleri[p['Rol_Secimi']]
+        
+        # Güvenli erişim
+        p_pref = p['Rol_Secimi']
+        if p_pref not in rol_isimleri: p_pref = "⚖️ Dengeli"
+        aktif_rol_str = rol_isimleri[p_pref]
         
         badges = []
         if p['VFM_Skoru'] >= 25.0: badges.append("💎 Kelepir")
@@ -258,7 +269,14 @@ if file:
         role = p['Role']
         if role_map[role]['bench'] in mustermann:
             bench = mustermann[role_map[role]['bench']]
-            g_profili = st.radio("Radar Görünümü", ["⚖️ Dengeli", "⚔️ IP (Hücum)", "🛡️ OOP (Svn)"], horizontal=True, label_visibility="collapsed", index=list(rol_isimleri.values()).index(aktif_rol_str))
+            
+            # Geçerli index bulma
+            try:
+                current_idx = list(rol_isimleri.values()).index(aktif_rol_str)
+            except:
+                current_idx = 0
+                
+            g_profili = st.radio("Radar Görünümü", ["⚖️ Dengeli", "⚔️ IP (Hücum)", "🛡️ OOP (Svn)"], horizontal=True, label_visibility="collapsed", index=current_idx)
             grafik_rol = rol_isimleri[g_profili]
             radar_stats = list(set(list(role_map[role]['weights']["IP (Hücum)"].keys()) + list(role_map[role]['weights']["OOP (Savunma)"].keys()))) if grafik_rol == "Dengeli" else list(role_map[role]['weights'][grafik_rol].keys())
             fig, ax = plt.subplots(figsize=(4, 4), subplot_kw={"polar": True})
@@ -281,10 +299,14 @@ if file:
         show_df = f_df[['Player', 'Age', 'Role', 'Rol_Secimi', 'IP_Score', 'OOP_Score', 'Scout_Puanı', 'VFM_Skoru', 'Price_Num']].copy()
         show_df.insert(0, ' Seç', False)
         
+        # Seçenekleri temiz ve string olarak zorla
+        valid_roles = [str(r) for r in ana_mevki_listesi]
+        valid_prefs = [str(k) for k in rol_isimleri.keys()]
+        
         edited_df = st.data_editor(show_df, column_config={
             " Seç": st.column_config.CheckboxColumn("Seç", help="Toplu işlem için oyuncuları seçin"),
-            "Role": st.column_config.SelectboxColumn("Mevki", options=ana_mevki_listesi, help="Oyuncunun ana analiz grubunu manuel seçin"),
-            "Rol_Secimi": st.column_config.SelectboxColumn("🔄 Tercih", help="Profil değiştirince Puan güncellenir", options=list(rol_isimleri.keys())),
+            "Role": st.column_config.SelectboxColumn("Mevki", options=valid_roles, required=True, help="Oyuncunun ana analiz grubunu manuel seçin"),
+            "Rol_Secimi": st.column_config.SelectboxColumn("🔄 Tercih", options=valid_prefs, required=True, help="Profil değiştirince Puan güncellenir"),
             "IP_Score": st.column_config.ProgressColumn("⚔️ IP", help=stat_yardim["IP_Score"], format="%.1f", min_value=0, max_value=200),
             "OOP_Score": st.column_config.ProgressColumn("🛡️ OOP", help=stat_yardim["OOP_Score"], format="%.1f", min_value=0, max_value=200),
             "Scout_Puanı": st.column_config.ProgressColumn("⭐ Puan", help=stat_yardim["Scout_Puanı"], format="%.1f", min_value=0, max_value=200),
@@ -297,23 +319,28 @@ if file:
         if selected_for_batch:
             st.info(f"⚡ {len(selected_for_batch)} oyuncu seçildi. Toplu işlem yapabilirsiniz.")
             col_b1, col_b2, col_b3 = st.columns([1, 1, 1])
-            new_role = col_b1.selectbox("Yeni Mevki:", ana_mevki_listesi, key="batch_role")
-            new_pref = col_b2.selectbox("Yeni Tercih:", list(rol_isimleri.keys()), key="batch_pref")
+            new_role = col_b1.selectbox("Yeni Mevki:", valid_roles, key="batch_role")
+            new_pref = col_b2.selectbox("Yeni Tercih:", valid_prefs, key="batch_pref")
             if col_b3.button("Seçililere Uygula", use_container_width=True):
                 for p_name in selected_for_batch:
-                    st.session_state.player_base_roles[p_name] = new_role
-                    st.session_state.player_preferences[p_name] = new_pref
+                    if new_role: st.session_state.player_base_roles[p_name] = new_role
+                    if new_pref: st.session_state.player_preferences[p_name] = new_pref
                 st.rerun()
         else:
             for idx, row in edited_df.iterrows():
                 p_name = row['Player']
                 changed = False
-                if st.session_state.player_base_roles.get(p_name) != row['Role']:
-                    st.session_state.player_base_roles[p_name] = row['Role']
-                    changed = True
-                if st.session_state.player_preferences.get(p_name) != row['Rol_Secimi']:
-                    st.session_state.player_preferences[p_name] = row['Rol_Secimi']
-                    changed = True
+                # Boş değerleri engellemek için kontrol
+                if row['Role'] and row['Role'] in valid_roles:
+                    if st.session_state.player_base_roles.get(p_name) != row['Role']:
+                        st.session_state.player_base_roles[p_name] = row['Role']
+                        changed = True
+                
+                if row['Rol_Secimi'] and row['Rol_Secimi'] in valid_prefs:
+                    if st.session_state.player_preferences.get(p_name) != row['Rol_Secimi']:
+                        st.session_state.player_preferences[p_name] = row['Rol_Secimi']
+                        changed = True
+                
                 if changed: st.rerun()
 
         st.markdown("---")
