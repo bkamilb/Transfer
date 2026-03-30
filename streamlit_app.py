@@ -189,6 +189,11 @@ file = st.file_uploader("FM Export CSV'sini Yükle", type="csv")
 
 if file:
     df = pd.read_csv(file, sep=";")
+    
+    # Eğer eskiyse veya Recommendation sütunu yoksa sorun çıkmaması için
+    if 'Recommendation' not in df.columns: 
+        df['Recommendation'] = '-'
+        
     df['Minutes'] = df['Minutes'].apply(lambda x: x if x > 0 else 1)
     df['Price_Num'] = df['Transfer Value'].apply(parse_price)
     if 'Tck A' in df.columns: df['Tck A/90'] = (df['Tck A'].apply(to_num) * 90) / df['Minutes']
@@ -239,7 +244,26 @@ if file:
         
         total_mult = multiplier * char_multiplier
         bonus = max(0, (23 - row['Age']) * 10) if strategy == "Kâr Odaklı (Geliştir-Sat)" else 0
-        return pd.Series([final_raw * total_mult + bonus, results["IP_Ham"] * total_mult + bonus, results["OOP_Ham"] * total_mult + bonus])
+        
+        # --- OYUN İÇİ SCOUT ÖNERİSİ (RECOMMENDATION) PUANLAMASI ---
+        rec = str(row.get('Recommendation', '-')).strip().upper()
+        scout_bonus = 0
+        if rec == 'A+': scout_bonus = 15
+        elif rec == 'A': scout_bonus = 12
+        elif rec == 'A-': scout_bonus = 10
+        elif rec == 'B+': scout_bonus = 8
+        elif rec == 'B': scout_bonus = 6
+        elif rec == 'B-': scout_bonus = 4
+        elif rec == 'C+': scout_bonus = 2
+        elif rec == 'C': scout_bonus = 1
+        elif rec == 'C-': scout_bonus = -2
+        elif rec == 'D': scout_bonus = -6
+        elif rec == 'E': scout_bonus = -10
+        elif rec == 'F': scout_bonus = -15
+
+        return pd.Series([final_raw * total_mult + bonus + scout_bonus, 
+                          results["IP_Ham"] * total_mult + bonus + scout_bonus, 
+                          results["OOP_Ham"] * total_mult + bonus + scout_bonus])
 
     df[['Scout_Puanı', 'IP_Score', 'OOP_Score']] = df.apply(calc_scores, axis=1)
     df['VFM_Skoru'] = (df['Scout_Puanı'] / ((df['Price_Num'] / 1000000) + 1)).round(1) 
@@ -283,12 +307,14 @@ if file:
 
     with col_m:
         st.markdown("### 📋 Oyuncu Analiz Masası")
-        show_df = f_df[['Player', 'Age', 'Role', 'Rol_Secimi', 'IP_Score', 'OOP_Score', 'Scout_Puanı', 'VFM_Skoru', 'Price_Num']].copy()
+        # Recommendation sütunu analiz masasına eklendi
+        show_df = f_df[['Player', 'Age', 'Recommendation', 'Role', 'Rol_Secimi', 'IP_Score', 'OOP_Score', 'Scout_Puanı', 'VFM_Skoru', 'Price_Num']].copy()
         show_df.insert(0, ' Seç', False)
         valid_roles = [str(r) for r in ana_mevki_listesi]; valid_prefs = [str(k) for k in rol_isimleri.keys()]
         
         edited_df = st.data_editor(show_df, column_config={
             " Seç": st.column_config.CheckboxColumn("Seç"),
+            "Recommendation": st.column_config.TextColumn("Scout Notu"),
             "Role": st.column_config.SelectboxColumn("Mevki", options=valid_roles, required=True),
             "Rol_Secimi": st.column_config.SelectboxColumn("🔄 Tercih", options=valid_prefs, required=True),
             "IP_Score": st.column_config.ProgressColumn("⚔️ IP", help=stat_yardim["IP_Score"], format="%.1f", min_value=0, max_value=200),
@@ -296,7 +322,7 @@ if file:
             "Scout_Puanı": st.column_config.ProgressColumn("⭐ Puan", help=stat_yardim["Scout_Puanı"], format="%.1f", min_value=0, max_value=200),
             "VFM_Skoru": st.column_config.NumberColumn("VFM", help=stat_yardim["VFM_Skoru"]),
             "Price_Num": st.column_config.NumberColumn("Bonservis (€)", format="%d")
-        }, disabled=["Player", "Age", "IP_Score", "OOP_Score", "Scout_Puanı", "VFM_Skoru"], use_container_width=True, hide_index=True, height=450)
+        }, disabled=["Player", "Age", "Recommendation", "IP_Score", "OOP_Score", "Scout_Puanı", "VFM_Skoru"], use_container_width=True, hide_index=True, height=450)
         
         selected_for_batch = edited_df[edited_df[' Seç'] == True]['Player'].tolist()
         if selected_for_batch:
