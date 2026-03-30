@@ -113,6 +113,24 @@ def to_num(val):
         return float(val)
     except: return 0.0
 
+# OYUN İÇİ SCOUT TEMEL ÇARPAN HESAPLAYICISI
+def parse_scout_rec(val):
+    if pd.isna(val): return 1.0
+    v = str(val).upper().strip()
+    if 'A+' in v: return 1.30
+    if 'A' in v and '-' not in v: return 1.20
+    if 'A-' in v: return 1.15
+    if 'B+' in v: return 1.10
+    if 'B' in v and '-' not in v: return 1.05
+    if 'B-' in v: return 1.02
+    if 'C+' in v: return 1.00 # Nötr
+    if 'C' in v and '-' not in v: return 0.95
+    if 'C-' in v: return 0.90
+    if 'D' in v: return 0.80
+    if 'E' in v: return 0.65
+    if 'F' in v: return 0.50
+    return 1.0
+
 def get_mustermann_color(val, stat_name, role):
     v = to_num(val)
     role_config = role_map.get(role)
@@ -181,6 +199,13 @@ def get_role(pos, sec_pos=""):
 
 RADAR_COLORS = ['#00f2ff', '#ff0055', '#00ff66', '#ffaa00']
 
+# --- SESSION STATE İLK DEĞERLERİ ---
+if 'scout_weight' not in st.session_state:
+    st.session_state.scout_weight = 1.0
+
+def reset_scout_weight():
+    st.session_state.scout_weight = 0.0
+
 # --- 4. STREAMLIT UI ---
 st.set_page_config(layout="wide", page_title="Moneyball Ultimate")
 st.markdown("""<style>.main { background-color: #0E1117; color: white; } .stProgress > div > div > div > div { background-color: #00f2ff; } div.row-widget.stRadio > div { flex-direction: row; gap: 15px; justify-content: center; }</style>""", unsafe_allow_html=True)
@@ -190,7 +215,7 @@ file = st.file_uploader("FM Export CSV'sini Yükle", type="csv")
 if file:
     df = pd.read_csv(file, sep=";")
     
-    # Eğer eskiyse veya Recommendation sütunu yoksa sorun çıkmaması için
+    # Scout Notu Sütunu Kontrolü
     if 'Recommendation' not in df.columns: 
         df['Recommendation'] = '-'
         
@@ -216,6 +241,20 @@ if file:
     strategy = st.sidebar.radio("Strateji", ["Kâr Odaklı (Geliştir-Sat)", "Performans (Glory)"])
     min_v, max_v = int(df['Price_Num'].min()), int(df['Price_Num'].max())
     budget = st.sidebar.slider("Bonservis Aralığı", min_value=min_v, max_value=max_v, value=(min_v, max_v), step=100000)
+
+    # --- YENİ EKLENEN BÖLÜM: SCOUT ETKİSİ KONTROLÜ ---
+    st.sidebar.markdown("---")
+    st.sidebar.header("🕵️ Scout Etkisi")
+    scout_weight_slider = st.sidebar.slider(
+        "Çarpan Gücü (0 = Etkisiz)", 
+        min_value=0.0, 
+        max_value=2.0, 
+        value=st.session_state.scout_weight, 
+        step=0.1, 
+        key="scout_weight",
+        help="FM Scout notlarının istatistiklere etkisini artırır veya azaltır. 0'a çekilirse sadece oyun içi istatistikler baz alınır."
+    )
+    st.sidebar.button("🔄 Etkiyi Sıfırla (Eski Haline Getir)", on_click=reset_scout_weight)
 
     def calc_scores(row):
         player_role = str(row.get('Role', "Bek"))
@@ -243,27 +282,18 @@ if file:
         else: final_raw = (results["Dengeli_Ham"] * 0.7) + (results["OOP_Ham"] * 0.3)
         
         total_mult = multiplier * char_multiplier
-        bonus = max(0, (23 - row['Age']) * 10) if strategy == "Kâr Odaklı (Geliştir-Sat)" else 0
+        bonus = max(0, (23 - row['Age']) * 5) if strategy == "Kâr Odaklı (Geliştir-Sat)" else 0
         
-        # --- OYUN İÇİ SCOUT ÖNERİSİ (RECOMMENDATION) PUANLAMASI ---
-        rec = str(row.get('Recommendation', '-')).strip().upper()
-        scout_bonus = 0
-        if rec == 'A+': scout_bonus = 15
-        elif rec == 'A': scout_bonus = 12
-        elif rec == 'A-': scout_bonus = 10
-        elif rec == 'B+': scout_bonus = 8
-        elif rec == 'B': scout_bonus = 6
-        elif rec == 'B-': scout_bonus = 4
-        elif rec == 'C+': scout_bonus = 2
-        elif rec == 'C': scout_bonus = 1
-        elif rec == 'C-': scout_bonus = -2
-        elif rec == 'D': scout_bonus = -6
-        elif rec == 'E': scout_bonus = -10
-        elif rec == 'F': scout_bonus = -15
-
-        return pd.Series([final_raw * total_mult + bonus + scout_bonus, 
-                          results["IP_Ham"] * total_mult + bonus + scout_bonus, 
-                          results["OOP_Ham"] * total_mult + bonus + scout_bonus])
+        # --- YENİ EKLENEN BÖLÜM: AKTİF ÇARPAN UYGULAMASI ---
+        rec = str(row.get('Recommendation', '-'))
+        base_scout_mult = parse_scout_rec(rec)
+        active_scout_mult = 1.0 + ((base_scout_mult - 1.0) * st.session_state.scout_weight)
+        
+        return pd.Series([
+            (final_raw * total_mult + bonus) * active_scout_mult, 
+            (results["IP_Ham"] * total_mult + bonus) * active_scout_mult, 
+            (results["OOP_Ham"] * total_mult + bonus) * active_scout_mult
+        ])
 
     df[['Scout_Puanı', 'IP_Score', 'OOP_Score']] = df.apply(calc_scores, axis=1)
     df['VFM_Skoru'] = (df['Scout_Puanı'] / ((df['Price_Num'] / 1000000) + 1)).round(1) 
@@ -307,7 +337,7 @@ if file:
 
     with col_m:
         st.markdown("### 📋 Oyuncu Analiz Masası")
-        # Recommendation sütunu analiz masasına eklendi
+        # Analiz masasına Recommendation ekledim
         show_df = f_df[['Player', 'Age', 'Recommendation', 'Role', 'Rol_Secimi', 'IP_Score', 'OOP_Score', 'Scout_Puanı', 'VFM_Skoru', 'Price_Num']].copy()
         show_df.insert(0, ' Seç', False)
         valid_roles = [str(r) for r in ana_mevki_listesi]; valid_prefs = [str(k) for k in rol_isimleri.keys()]
